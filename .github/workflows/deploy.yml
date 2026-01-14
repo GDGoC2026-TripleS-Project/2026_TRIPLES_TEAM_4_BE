@@ -1,0 +1,121 @@
+name: Unimate CI/CD (ECR:test -> EC2)
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  # ✅ 리포는 무조건 test로 고정
+  ECR_REPOSITORY: test
+  # ✅ 컨테이너 이름 고정
+  CONTAINER_NAME: unimate-app
+  # ✅ 헬스 체크 경로 고정
+  HEALTH_URL: http://localhost:8080/api/system/health
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_uri: ${{ steps.vars.outputs.image_uri }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set variables
+        id: vars
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "image_uri=${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials (ECR push)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ✅ Dockerfile이 루트에 있다는 가정 (아니면 아래 안내대로 수정)
+      - name: Build & Push (two tags)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_uri }}:unimate-${{ steps.vars.outputs.short_sha }}
+            ${{ steps.vars.outputs.image_uri }}:unimate-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy_to_ec2:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy (docker pull & run)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          port: ${{ secrets.EC2_PORT }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            IMAGE="${{ needs.build_and_push.outputs.image_uri }}:unimate-latest"
+
+            echo "== 1) Login to ECR =="
+            aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" \
+              | docker login --username AWS --password-stdin "${{ secrets.ECR_REGISTRY }}"
+
+            echo "== 2) Pull image =="
+            docker pull "$IMAGE"
+
+            echo "== 3) Stop old container (if exists) =="
+            docker rm -f "${{ env.CONTAINER_NAME }}" || true
+
+            echo "== 4) Run new container =="
+            docker run -d --name "${{ env.CONTAINER_NAME }}" \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -e TZ=Asia/Seoul \
+              -e SPRING_PROFILES_ACTIVE='${{ secrets.SPRING_PROFILES_ACTIVE }}' \
+              -e DB_HOST='${{ secrets.DB_HOST }}' \
+              -e DB_PORT='${{ secrets.DB_PORT }}' \
+              -e DB_NAME='${{ secrets.DB_NAME }}' \
+              -e DB_USERNAME='${{ secrets.DB_USERNAME }}' \
+              -e DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+              -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+              -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              -e GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
+              -e MAIL_HOST='${{ secrets.MAIL_HOST }}' \
+              -e MAIL_PORT='${{ secrets.MAIL_PORT }}' \
+              -e MAIL_USERNAME='${{ secrets.MAIL_USERNAME }}' \
+              -e MAIL_PASSWORD='${{ secrets.MAIL_PASSWORD }}' \
+              -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
+              "$IMAGE"
+
+            echo "== 5) Health check: ${{ env.HEALTH_URL }} =="
+            for i in $(seq 1 30); do
+              if curl -sf "${{ env.HEALTH_URL }}" > /dev/null; then
+                echo "OK: health endpoint is responding"
+                break
+              fi
+              echo "waiting... ($i)"
+              sleep 2
+            done
+
+            echo "== 6) Container status =="
+            docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+            echo "== 7) Swagger quick check (path fixed to /swagger-ui.html) =="
+            curl -I http://localhost:8080/swagger-ui.html | head -n 5 || true

@@ -1,4 +1,4 @@
-package com.gdg.unimate;
+package com.gdg.unimatebackend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
