@@ -1,9 +1,11 @@
 package com.gdg.unimatebackend.healthCheck.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SystemHealthService {
@@ -15,6 +17,7 @@ public class SystemHealthService {
             Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
             return result != null && result == 1;
         } catch (Exception e) {
+            log.warn("DB health check failed: {}", e.getMessage(), e);
             return false;
         }
     }
