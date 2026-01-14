@@ -5,15 +5,12 @@ on:
     branches: ["main"]
 
 env:
-  # ✅ 리포는 무조건 test로 고정
   ECR_REPOSITORY: test
-  # ✅ 컨테이너 이름 고정
   CONTAINER_NAME: unimate-app
-  # ✅ 헬스 체크 경로 고정
   HEALTH_URL: http://localhost:8080/api/system/health
 
 jobs:
-  build_and_push:
+  build:
     runs-on: ubuntu-latest
     outputs:
       image_uri: ${{ steps.vars.outputs.image_uri }}
@@ -43,7 +40,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ✅ Dockerfile이 루트에 있다는 가정 (아니면 아래 안내대로 수정)
       - name: Build & Push (two tags)
         uses: docker/build-push-action@v6
         with:
@@ -56,8 +52,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy_to_ec2:
-    needs: build_and_push
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -71,7 +67,7 @@ jobs:
           script: |
             set -e
 
-            IMAGE="${{ needs.build_and_push.outputs.image_uri }}:unimate-latest"
+            IMAGE="${{ needs.build.outputs.image_uri }}:unimate-latest"
 
             echo "== 1) Login to ECR =="
             aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" \
@@ -117,5 +113,5 @@ jobs:
             echo "== 6) Container status =="
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
-            echo "== 7) Swagger quick check (path fixed to /swagger-ui.html) =="
+            echo "== 7) Swagger quick check (/swagger-ui.html) =="
             curl -I http://localhost:8080/swagger-ui.html | head -n 5 || true
