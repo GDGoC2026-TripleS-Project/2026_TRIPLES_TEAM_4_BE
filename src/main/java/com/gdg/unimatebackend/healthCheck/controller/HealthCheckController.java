@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-@Tag(name = "시스템", description = "서버 상태/헬스체크 API")
+@Tag(name = "시스템", description = "서버 상태/헬스 체크 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/system")
