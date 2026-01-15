@@ -45,4 +45,3 @@ public class HealthCheckController {
         return ResponseEntity.ok(res);
     }
 }
-d
