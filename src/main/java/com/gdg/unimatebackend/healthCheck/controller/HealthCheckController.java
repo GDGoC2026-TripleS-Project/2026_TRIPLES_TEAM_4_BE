@@ -22,7 +22,7 @@ public class HealthCheckController {
     private final SystemHealthService systemHealthService;
 
     @GetMapping("/health")
-    @Operation(summary = "서버 상태 확인", description = "서버 및 DB 연결 상태를 확인합니다.")
+    @Operation(summary = "서버 상태확인", description = "서버 및 DB 연결 상태를 확인합니다.")
     public ResponseEntity<Map<String, Object>> health() {
         boolean dbUp = systemHealthService.isDatabaseUp();
 
