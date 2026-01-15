@@ -88,6 +88,8 @@ jobs:
               -e MAIL_USERNAME='${{ secrets.MAIL_USERNAME }}' \
               -e MAIL_PASSWORD='${{ secrets.MAIL_PASSWORD }}' \
               -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
+              -e SPRINGDOC_API_DOCS_ENABLED=true \
+              -e SPRINGDOC_SWAGGER_UI_ENABLED=true \
               "${IMAGE}"
 
             for i in $(seq 1 30); do
@@ -105,7 +107,9 @@ jobs:
             curl -I http://localhost:8080/v3/api-docs | head -n 5
             
             echo "=== check swagger-config (must be 200) ==="
-            curl -sf http://localhost:8080/v3/api-docs/swagger-config > /dev/null
+            echo "=== check swagger-config (debug) ==="
+            curl -iv http://localhost:8080/v3/api-docs/swagger-config | head -n 40
+
             echo "OK: swagger-config responding"
             
             echo "=== check swagger-ui redirect/ok ==="

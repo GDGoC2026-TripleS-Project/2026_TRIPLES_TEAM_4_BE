@@ -10,7 +10,7 @@ COPY src src
 RUN chmod +x ./gradlew
 RUN ./gradlew clean bootJar -x test
 
-# ✅ build/libs 안에서 plain.jar 제거 + 결과물을 app.jar로 고정
+# build/libs 에서 plain 제거 + 남은 jar를 app.jar로 고정
 RUN ls -al /app/build/libs && \
     rm -f /app/build/libs/*-plain.jar && \
     cp /app/build/libs/*.jar /app/app.jar
