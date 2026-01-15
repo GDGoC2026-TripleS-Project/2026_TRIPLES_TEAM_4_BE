@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -32,8 +33,12 @@ public class SwaggerConfig {
                 .contact(new Contact().name("tripleS").email("seokhawnkim@gmail.com"))
                 .license(new License().name("Apache 2.0").url("http://www.apache.org/licenses/LICENSE-2.0.html"));
 
+        // ✅ Swagger가 Try it out 요청을 https로 생성하게 강제
+        Server prodServer = new Server().url("https://seok-hwan1.duckdns.org");
+
         return new OpenAPI()
                 .info(info)
+                .addServersItem(prodServer)
                 .components(new Components().addSecuritySchemes("bearerAuth", securityScheme))
                 .addSecurityItem(securityRequirement);
     }
