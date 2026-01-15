@@ -19,7 +19,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:create}
+      ddl-auto: ${DDL_AUTO:update}
     properties:
       hibernate:
         format_sql: false
@@ -38,8 +38,8 @@ spring:
       file-size-threshold: 2KB
 
   mail:
-    host: smtp.gmail.com
-    port: 587
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     properties:
@@ -57,7 +57,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html
     url: /v3/api-docs
     display-request-duration: true
@@ -80,11 +80,16 @@ app:
     prod-url: ${SWAGGER_PROD_URL:http://localhost:8080}
   dev-token:
     enabled: ${DEV_TOKEN_ENABLED:false}
+  frontend:
+    url: ${FRONTEND_URL:}
 
 oauth:
   kakao:
-    client-id: ${KAKAO_CLIENT_ID:f0090451b3aedc13683fc670394f8de8}
-    client-secret: ${KAKAO_CLIENT_SECRET:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
+    client-id: ${KAKAO_CLIENT_ID:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
+    client-secret: ${KAKAO_CLIENT_SECRET:f0090451b3aedc13683fc670394f8de8}
     redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/auth/kakao/callback}
     authorize-uri: https://kauth.kakao.com/oauth/authorize
     token-uri: https://kauth.kakao.com/oauth/token
+
+  
+
