@@ -100,4 +100,13 @@ jobs:
             done
 
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-            curl -I http://localhost:8080/swagger-ui.html | head -n 5 || true
+  
+            echo "=== check openapi ==="
+            curl -I http://localhost:8080/v3/api-docs | head -n 5
+            
+            echo "=== check swagger-config (must be 200) ==="
+            curl -sf http://localhost:8080/v3/api-docs/swagger-config > /dev/null
+            echo "OK: swagger-config responding"
+            
+            echo "=== check swagger-ui redirect/ok ==="
+            curl -I http://localhost:8080/swagger-ui.html | head -n 5
