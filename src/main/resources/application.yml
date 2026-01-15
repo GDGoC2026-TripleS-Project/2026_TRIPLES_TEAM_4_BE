@@ -61,8 +61,8 @@ springdoc:
     groups-order: ASC
 
 jwt:
-  secret: ${JWT_SECRET:}
-  expiration: ${JWT_EXPIRATION:86400000}
+  secret: ${JWT_SECRET:unimate-local-jwt-secret-key-32bytes!!}
+  expiration: ${JWT_EXPIRATION:3600000}
 
 aws:
   s3:
