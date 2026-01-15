@@ -7,6 +7,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -18,9 +19,11 @@ public class KakaoApiService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // ✅ application.yml 건드리지 않기 위해 "기본값"을 포함한다.
     @Value("${oauth.kakao.client-id:}")
     private String clientId;
+
+    @Value("${oauth.kakao.client-secret:}")
+    private String clientSecret;
 
     @Value("${oauth.kakao.redirect-uri:}")
     private String redirectUri;
@@ -35,16 +38,11 @@ public class KakaoApiService {
     private String userInfoUri;
 
     /**
-     * ✅ SocialAuthService에서 호출하는 메서드 (빨간줄 해결 1)
+     * 카카오 로그인 화면으로 이동할 Authorize URL 생성
      */
     public String buildAuthorizeUrl() {
-        // clientId/redirectUri가 비어있으면 URL이 깨지니, 즉시 확인되게 예외
-        if (clientId == null || clientId.isBlank()) {
-            throw new IllegalStateException("oauth.kakao.client-id is empty");
-        }
-        if (redirectUri == null || redirectUri.isBlank()) {
-            throw new IllegalStateException("oauth.kakao.redirect-uri is empty");
-        }
+        requireText(clientId, "oauth.kakao.client-id is empty");
+        requireText(redirectUri, "oauth.kakao.redirect-uri is empty");
 
         return UriComponentsBuilder.fromUriString(authorizeUri)
                 .queryParam("response_type", "code")
@@ -55,19 +53,12 @@ public class KakaoApiService {
     }
 
     /**
-     * ✅ SocialAuthService에서 호출하는 메서드 (빨간줄 해결 2)
      * 인가코드(code) → 카카오 access_token 교환
      */
     public String getAccessToken(String code) {
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("code is required");
-        }
-        if (clientId == null || clientId.isBlank()) {
-            throw new IllegalStateException("oauth.kakao.client-id is empty");
-        }
-        if (redirectUri == null || redirectUri.isBlank()) {
-            throw new IllegalStateException("oauth.kakao.redirect-uri is empty");
-        }
+        requireText(code, "code is required");
+        requireText(clientId, "oauth.kakao.client-id is empty");
+        requireText(redirectUri, "oauth.kakao.redirect-uri is empty");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -78,47 +69,72 @@ public class KakaoApiService {
         form.add("redirect_uri", redirectUri);
         form.add("code", code);
 
+        // ✅ 핵심: Client Secret 사용 ON이면 필요할 수 있음 (401 방지)
+        if (clientSecret != null && !clientSecret.isBlank()) {
+            form.add("client_secret", clientSecret);
+        }
+
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
 
-        ResponseEntity<Map> response = restTemplate.exchange(
-                tokenUri,
-                HttpMethod.POST,
-                request,
-                Map.class
-        );
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    tokenUri,
+                    HttpMethod.POST,
+                    request,
+                    Map.class
+            );
 
-        Object token = (response.getBody() == null) ? null : response.getBody().get("access_token");
-        if (token == null) {
-            throw new IllegalStateException("Kakao token response has no access_token");
+            Object token = (response.getBody() == null) ? null : response.getBody().get("access_token");
+            if (token == null) {
+                throw new IllegalStateException("Kakao token response has no access_token");
+            }
+            return String.valueOf(token);
+
+        } catch (HttpClientErrorException e) {
+            // 카카오가 401/400을 body 없이 줄 때가 있어서 status라도 보이게
+            throw new IllegalStateException(
+                    "Kakao token request failed. status=" + e.getStatusCode(),
+                    e
+            );
         }
-        return String.valueOf(token);
     }
 
     /**
-     * ✅ access_token으로 카카오 사용자 정보 조회
+     * access_token으로 카카오 사용자 정보 조회
      */
     public KakaoUserResponse getUserInfo(String accessToken) {
-        if (accessToken == null || accessToken.isBlank()) {
-            throw new IllegalArgumentException("accessToken is required");
-        }
+        requireText(accessToken, "accessToken is required");
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         HttpEntity<Void> request = new HttpEntity<>(headers);
 
-        ResponseEntity<KakaoUserResponse> response = restTemplate.exchange(
-                userInfoUri,
-                HttpMethod.GET,
-                request,
-                KakaoUserResponse.class
-        );
+        try {
+            ResponseEntity<KakaoUserResponse> response = restTemplate.exchange(
+                    userInfoUri,
+                    HttpMethod.GET,
+                    request,
+                    KakaoUserResponse.class
+            );
 
-        KakaoUserResponse body = response.getBody();
-        if (body == null) {
-            throw new IllegalStateException("Kakao user info response is empty");
+            KakaoUserResponse body = response.getBody();
+            if (body == null) {
+                throw new IllegalStateException("Kakao user info response is empty");
+            }
+            return body;
+
+        } catch (HttpClientErrorException e) {
+            throw new IllegalStateException(
+                    "Kakao user-info request failed. status=" + e.getStatusCode(),
+                    e
+            );
         }
-        return body;
+    }
+
+    private void requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(message);
+        }
     }
 }
