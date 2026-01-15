@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 @Table(
         name = "users",
         uniqueConstraints = {
+
                 @UniqueConstraint(
                         name = "uk_users_email",
                         columnNames = "email"
@@ -35,6 +36,9 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -60,6 +64,12 @@ public class User {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    public void updateProfileImageUrl(String profileImageUrl) {
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+            this.profileImageUrl = profileImageUrl;
+        }
     }
 
     @PreUpdate
