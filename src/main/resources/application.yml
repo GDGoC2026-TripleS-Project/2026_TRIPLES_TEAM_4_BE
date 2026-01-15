@@ -85,8 +85,8 @@ app:
 
 oauth:
   kakao:
-    client-id: ${KAKAO_CLIENT_ID:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
-    client-secret: ${KAKAO_CLIENT_SECRET:f0090451b3aedc13683fc670394f8de8}
+    client-id: ${KAKAO_CLIENT_ID:f0090451b3aedc13683fc670394f8de8}
+    client-secret: ${KAKAO_CLIENT_SECRET:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
     redirect-uri: ${KAKAO_REDIRECT_URI:https://seok-hwan1.duckdns.org/api/auth/kakao/callback}
     authorize-uri: https://kauth.kakao.com/oauth/authorize
     token-uri: https://kauth.kakao.com/oauth/token
