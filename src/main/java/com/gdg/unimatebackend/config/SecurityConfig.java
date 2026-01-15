@@ -35,11 +35,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> {
-                    if (frontendUrl != null && !frontendUrl.isEmpty()) {
-                        cors.configurationSource(corsConfigurationSource());
-                    }
-                })
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
@@ -61,9 +57,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // ✅ 로컬 개발
         configuration.addAllowedOriginPattern("http://localhost:*");
         configuration.addAllowedOriginPattern("http://127.0.0.1:*");
 
+        // ✅ 운영(duckdns)
+        configuration.addAllowedOriginPattern("https://seok-hwan1.duckdns.org");
+        configuration.addAllowedOriginPattern("http://seok-hwan1.duckdns.org");
+
+        // ✅ 프론트 URL이 있으면 추가로 허용 (있으면 좋고 없어도 OK)
         if (frontendUrl != null && !frontendUrl.isEmpty()) {
             configuration.addAllowedOriginPattern(frontendUrl);
 
