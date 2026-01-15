@@ -13,7 +13,10 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-@Tag(name = "시스템", description = "서버 상태/헬스 체크 API")
+@Tag(
+        name = "시스템",
+        description = "서버 및 인프라 상태 확인 API"
+)
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/system")
@@ -21,8 +24,18 @@ public class HealthCheckController {
 
     private final SystemHealthService systemHealthService;
 
+    @Operation(
+            summary = "서버 헬스 체크",
+            description = """
+                    서버 및 데이터베이스 연결 상태를 확인합니다.
+
+                    ✔️ 배포 파이프라인 헬스체크 용도
+                    ✔️ status:
+                       - UP: 서버 및 DB 정상
+                       - DEGRADED: 서버는 정상, DB 문제
+                    """
+    )
     @GetMapping("/health")
-    @Operation(summary = "서버 상태확인", description = "서버 및 DB 연결 상태를 확인합니다.")
     public ResponseEntity<Map<String, Object>> health() {
         boolean dbUp = systemHealthService.isDatabaseUp();
 
