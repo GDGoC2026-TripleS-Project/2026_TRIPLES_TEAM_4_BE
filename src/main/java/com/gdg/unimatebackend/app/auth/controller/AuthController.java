@@ -3,38 +3,53 @@ package com.gdg.unimatebackend.app.auth.controller;
 import com.gdg.unimatebackend.app.auth.dto.AuthTokenResponse;
 import com.gdg.unimatebackend.app.auth.dto.KakaoLoginRequest;
 import com.gdg.unimatebackend.app.auth.service.SocialAuthService;
-import com.gdg.unimatebackend.global.security.jwt.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
-@RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@RequestMapping("/api/auth/kakao")
 public class AuthController {
 
     private final SocialAuthService socialAuthService;
-    private final JwtUtil jwtUtil;
 
-    @Value("${app.dev-token.enabled:false}")
-    private boolean devTokenEnabled;
-
-    // ✅ 카카오 로그인 (운영에서도 사용)
-    @PostMapping("/kakao")
-    public AuthTokenResponse kakaoLogin(@RequestBody KakaoLoginRequest request) {
-        return socialAuthService.kakaoLogin(request);
+    /**
+     * 1) 카카오 로그인 페이지로 보낼 authorize URL 생성
+     * - Postman에서 호출해서 URL을 받은 뒤 브라우저로 열어도 되고
+     * - 브라우저에서 바로 /api/auth/kakao/authorize-url 을 열어도 됨
+     */
+    @GetMapping("/authorize-url")
+    public ResponseEntity<String> authorizeUrl() {
+        return ResponseEntity.ok(socialAuthService.buildKakaoAuthorizeUrl());
     }
 
-    // ⚠️ 개발용 토큰 발급 (운영에서는 app.dev-token.enabled=false로 막힘)
-    @GetMapping("/dev-token")
-    public Map<String, Object> devToken(@RequestParam Long userId) {
-        if (!devTokenEnabled) {
-            // 운영에서 404처럼 보이게 하고 싶으면 IllegalArgumentException 대신 RuntimeException으로 커스텀 처리도 가능
-            throw new IllegalArgumentException("dev-token is disabled");
-        }
-        String token = jwtUtil.generateToken(userId);
-        return Map.of("token", token, "userId", userId);
+    /**
+     * 2) 카카오 로그인 후 리다이렉트되는 콜백
+     * - redirect-uri로 등록한 주소가 여기와 정확히 같아야 함
+     * - code -> token -> user/me -> 우리 서비스 JWT 발급
+     */
+    @GetMapping("/callback")
+    public ResponseEntity<AuthTokenResponse> callback(@RequestParam("code") String code) {
+        return ResponseEntity.ok(socialAuthService.kakaoLoginByCode(code));
+    }
+
+    /**
+     * 3) (백엔드 단독 테스트용) access_token을 직접 넣어서 로그인 처리
+     * - 프론트 없이 Postman으로 가장 쉽게 검증 가능
+     */
+    @PostMapping("/login")
+    public ResponseEntity<AuthTokenResponse> login(@RequestBody KakaoLoginRequest request) {
+        return ResponseEntity.ok(socialAuthService.kakaoLogin(request));
+    }
+
+    /**
+     * ✅ (테스트 전용) 카카오 인가코드(code)만 화면에 출력
+     * - 이 엔드포인트는 code를 "소비하지 않는다"
+     * - Postman에서 /callback 호출할 때 code를 1회만 사용하게 해준다.
+     */
+    @GetMapping("/code")
+    public ResponseEntity<String> codeOnly(@RequestParam("code") String code) {
+        return ResponseEntity.ok(code);
     }
 }

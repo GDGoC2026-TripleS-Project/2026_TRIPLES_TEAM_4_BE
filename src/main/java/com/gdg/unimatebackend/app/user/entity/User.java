@@ -1,6 +1,5 @@
 package com.gdg.unimatebackend.app.user.entity;
 
-import com.gdg.unimatebackend.app.user.entity.AuthProvider;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -10,8 +9,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -80,4 +77,14 @@ public class User {
         this.provider = provider;
         this.providerId = providerId;
     }
+    public static User createKakaoUser(String providerId, String email, String nickname) {
+        User u = new User(); // ✅ 같은 클래스 내부라 protected 생성자여도 OK
+
+        u.linkSocial(AuthProvider.KAKAO, providerId); // 너가 이미 쓰는 메서드
+        u.email = email; // ✅ setEmail 없으니 필드 직접 세팅(클래스 내부니까 가능)
+
+        u.updateProfile(nickname); // 너가 이미 쓰는 메서드
+        return u;
+    }
+
 }

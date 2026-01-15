@@ -1,4 +1,10 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
+  profiles:
+    active: prod
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
@@ -13,12 +19,16 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update}
+      ddl-auto: update   # ✅ 운영은 절대 create 금지
     properties:
       hibernate:
         format_sql: false
     show-sql: false
     open-in-view: false
+
+  jackson:
+    date-format: yyyy-MM-dd
+    time-zone: Asia/Seoul
 
   mail:
     host: smtp.gmail.com
@@ -40,10 +50,10 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
+    # ✅ 운영에서는 swagger 접근 제한/차단 권장
+    enabled: ${SWAGGER_ENABLED:false}
     path: /swagger-ui.html
     url: /v3/api-docs
-    display-request-duration: true
-    groups-order: ASC
 
 jwt:
   secret: ${JWT_SECRET}
@@ -51,12 +61,22 @@ jwt:
 
 aws:
   s3:
-    access-key: ${AWS_ACCESS_KEY:${AWS_ACCESS_KEY_ID:}}
-    secret-key: ${AWS_SECRET_KEY:${AWS_SECRET_ACCESS_KEY:}}
-    bucket-name: ${AWS_S3_BUCKET_NAME:${S3_BUCKETNAME:}}
-    base-url: ${AWS_S3_BASE_URL:}
-    region: ${AWS_S3_REGION:${S3_REGION:ap-northeast-2}}
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY}
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    base-url: ${AWS_S3_BASE_URL}
+    region: ${AWS_S3_REGION:ap-northeast-2}
 
 app:
   swagger:
-    prod-url: http://seok-hwan1.duckdns.org
+    prod-url: https://seok-hwan1.duckdns.org
+  dev-token:
+    enabled: false
+
+oauth:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/kakao/callback
+    authorize-uri: https://kauth.kakao.com/oauth/authorize
+    token-uri: https://kauth.kakao.com/oauth/token

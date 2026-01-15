@@ -7,16 +7,19 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:unimate_db}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:unimate_db}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:1234}
     hikari:
-      maximum-pool-size: 5
-      minimum-idle: 2
-      connection-timeout: 30000
+      maximum-pool-size: ${DB_POOL_MAX:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONN_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
 
   jpa:
     hibernate:
+      # 로컬 테스트면 create / 운영이면 update 권장
       ddl-auto: ${DDL_AUTO:create}
     properties:
       hibernate:
@@ -66,24 +69,23 @@ jwt:
 
 aws:
   s3:
-    access-key: ${AWS_ACCESS_KEY:}
-    secret-key: ${AWS_SECRET_KEY:}
-    bucket-name: ${AWS_S3_BUCKET_NAME:}
+    access-key: ${AWS_ACCESS_KEY:${AWS_ACCESS_KEY_ID:}}
+    secret-key: ${AWS_SECRET_KEY:${AWS_SECRET_ACCESS_KEY:}}
+    bucket-name: ${AWS_S3_BUCKET_NAME:${S3_BUCKETNAME:}}
     base-url: ${AWS_S3_BASE_URL:}
-    region: ${AWS_S3_REGION:ap-northeast-2}
+    region: ${AWS_S3_REGION:${S3_REGION:ap-northeast-2}}
 
 app:
   swagger:
-    prod-url: http://localhost:8080
+    prod-url: ${SWAGGER_PROD_URL:http://localhost:8080}
   dev-token:
     enabled: ${DEV_TOKEN_ENABLED:false}
 
 oauth:
   kakao:
-    client-id: ${KAKAO_CLIENT_ID:}
-    client-secret: ${KAKAO_CLIENT_SECRET:} # 없어도 되는 경우 많음(카카오 설정에 따라)
-    redirect-uri: ${KAKAO_REDIRECT_URI:}   # code 방식 쓸 때 필요
+    client-id: ${KAKAO_CLIENT_ID:f0090451b3aedc13683fc670394f8de8}
+    client-secret: ${KAKAO_CLIENT_SECRET:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
+    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/auth/kakao/callback}
+    authorize-uri: https://kauth.kakao.com/oauth/authorize
     token-uri: https://kauth.kakao.com/oauth/token
-    user-info-uri: https://kapi.kakao.com/v2/user/me
-# 프론트가 “access token을 직접 넘겨주는 방식”이면 redirect-uri 없어도 됨.
-# 프론트가 “Authorization Code 방식”이면 redirect-uri가 반드시 필요.
+

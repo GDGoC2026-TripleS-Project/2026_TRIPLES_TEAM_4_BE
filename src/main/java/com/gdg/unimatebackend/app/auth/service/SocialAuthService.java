@@ -2,6 +2,10 @@ package com.gdg.unimatebackend.app.auth.service;
 
 import com.gdg.unimatebackend.app.auth.dto.AuthTokenResponse;
 import com.gdg.unimatebackend.app.auth.dto.KakaoLoginRequest;
+import com.gdg.unimatebackend.app.auth.dto.KakaoTokenResponse;
+import com.gdg.unimatebackend.app.auth.dto.KakaoUserResponse;
+import com.gdg.unimatebackend.app.auth.service.KakaoApiService;
+import com.gdg.unimatebackend.app.auth.service.KakaoOAuthClient;
 import com.gdg.unimatebackend.app.user.entity.AuthProvider;
 import com.gdg.unimatebackend.app.user.entity.User;
 import com.gdg.unimatebackend.app.user.repository.UserRepository;
@@ -15,57 +19,68 @@ import org.springframework.transaction.annotation.Transactional;
 public class SocialAuthService {
 
     private final KakaoOAuthClient kakaoOAuthClient;
+    private final KakaoApiService kakaoApiService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
-    @Transactional
-    public AuthTokenResponse kakaoLogin(KakaoLoginRequest request) {
-        String accessToken = resolveAccessToken(request);
-
-        KakaoOAuthClient.KakaoUserInfo info = kakaoOAuthClient.fetchUserInfo(accessToken);
-
-        // A안 전제: email은 필수 (미동의면 가입 불가 정책으로 처리)
-        if (info.getEmail() == null || info.getEmail().isBlank()) {
-            throw new IllegalArgumentException("Kakao email consent is required.");
-        }
-
-        // 1) 이메일로 계정 찾기 (Travodo 전제)
-        User user = userRepository.findByEmail(info.getEmail())
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(info.getEmail())
-                                .nickname(info.getNickname())
-                                .provider(AuthProvider.KAKAO)
-                                .providerId(info.getProviderId())
-                                .build()
-                ));
-
-        // 2) 기존 계정이면 소셜 연결(또는 갱신)
-        //    이미 다른 provider로 연결되어 있더라도 정책상 여기서 덮어쓸지/거부할지 선택 가능
-        user.linkSocial(AuthProvider.KAKAO, info.getProviderId());
-
-        // 3) 닉네임 업데이트(널이면 유지)
-        user.updateProfile(info.getNickname());
-
-        // 4) JWT 발급
-        String token = jwtUtil.generateToken(user.getId());
-
-        return AuthTokenResponse.builder()
-                .token(token)
-                .userId(user.getId())
-                .provider(user.getProvider())
-                .email(user.getEmail())
-                .nickname(user.getNickname())
-                .build();
+    public String buildKakaoAuthorizeUrl() {
+        return kakaoOAuthClient.buildAuthorizeUrl();
     }
 
-    private String resolveAccessToken(KakaoLoginRequest request) {
-        if (request.getAccessToken() != null && !request.getAccessToken().isBlank()) {
-            return request.getAccessToken();
+    @Transactional
+    public AuthTokenResponse kakaoLogin(KakaoLoginRequest request) {
+        String accessToken = request.accessToken();
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("accessToken is required.");
         }
-        if (request.getCode() != null && !request.getCode().isBlank()) {
-            return kakaoOAuthClient.exchangeCodeToAccessToken(request.getCode(), request.getRedirectUri());
+
+        KakaoUserResponse me = kakaoApiService.getUserInfo(accessToken.trim());
+        return upsertAndIssueJwt(me);
+    }
+
+    @Transactional
+    public AuthTokenResponse kakaoLoginByCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("code is required.");
         }
-        throw new IllegalArgumentException("Either accessToken or code must be provided.");
+
+        KakaoTokenResponse token = kakaoOAuthClient.exchangeCodeToToken(code.trim());
+        KakaoUserResponse me = kakaoApiService.getUserInfo(token.accessToken());
+        return upsertAndIssueJwt(me);
+    }
+
+    private AuthTokenResponse upsertAndIssueJwt(KakaoUserResponse me) {
+        if (me == null || me.id() == null) {
+            throw new IllegalArgumentException("Kakao user id is required.");
+        }
+
+        String providerId = String.valueOf(me.id());
+
+        // ✅ 재할당 없는 값으로 고정 (람다 캡처 OK)
+        final String finalEmail =
+                (me.email() != null && !me.email().isBlank())
+                        ? me.email()
+                        : providerId + "@unimate.local";
+
+        User user = userRepository.findByProviderAndProviderId(AuthProvider.KAKAO, providerId)
+                .orElseGet(() -> User.createKakaoUser(providerId, finalEmail, me.nickname()));
+
+        // 기존 유저도 닉네임 최신화(선택)
+        user.updateProfile(me.nickname());
+
+        User saved = userRepository.save(user);
+
+        String accessToken = jwtUtil.generateToken(saved.getId());
+        String refreshToken = jwtUtil.generateToken(saved.getId()); // 임시 동일
+
+        return new AuthTokenResponse(
+                accessToken,
+                refreshToken,
+                saved.getId(),
+                String.valueOf(saved.getProvider()),
+                saved.getProviderId(),
+                saved.getNickname(),
+                null
+        );
     }
 }
