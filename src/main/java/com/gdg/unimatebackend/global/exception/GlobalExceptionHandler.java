@@ -49,4 +49,13 @@ public class GlobalExceptionHandler {
         response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<?> handleNoResourceFound(Exception e) {
+        return ResponseEntity.status(404).body(Map.of(
+                "status", 404,
+                "message", "Not Found"
+        ));
+    }
+
 }
