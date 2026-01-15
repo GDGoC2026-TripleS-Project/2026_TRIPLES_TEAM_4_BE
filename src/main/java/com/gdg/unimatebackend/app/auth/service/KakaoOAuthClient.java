@@ -1,120 +1,116 @@
 package com.gdg.unimatebackend.app.auth.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
+import com.gdg.unimatebackend.app.auth.dto.KakaoTokenResponse;
+import com.gdg.unimatebackend.global.exception.KakaoApiException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
-@Component
+@Service
+@Slf4j
 @RequiredArgsConstructor
 public class KakaoOAuthClient {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final WebClient webClient = WebClient.builder().build();
+    // ✅ RestTemplate을 new로 만들지 말고, Spring Bean 주입받는 방식이 가장 안전
+    private final RestTemplate restTemplate;
 
-    @Value("${oauth.kakao.client-id:}")
+    @Value("${oauth.kakao.client-id}")
     private String clientId;
 
-    @Value("${oauth.kakao.client-secret:}")
+    /**
+     * ✅ 네 앱 상태상 client_secret이 사실상 필수.
+     * 값이 비어있으면 바로 실패하게 해서, 401을 환경설정 문제로 빠르게 분리한다.
+     */
+    @Value("${oauth.kakao.client-secret}")
     private String clientSecret;
 
-    @Value("${oauth.kakao.redirect-uri:}")
-    private String defaultRedirectUri;
+    @Value("${oauth.kakao.redirect-uri}")
+    private String redirectUri;
+
+    @Value("${oauth.kakao.authorize-uri:https://kauth.kakao.com/oauth/authorize}")
+    private String authorizeUri;
 
     @Value("${oauth.kakao.token-uri:https://kauth.kakao.com/oauth/token}")
     private String tokenUri;
 
-    @Value("${oauth.kakao.user-info-uri:https://kapi.kakao.com/v2/user/me}")
-    private String userInfoUri;
+    public String buildAuthorizeUrl() {
+        return UriComponentsBuilder.fromUriString(authorizeUri)
+                .queryParam("response_type", "code")
+                .queryParam("client_id", clientId)
+                .queryParam("redirect_uri", redirectUri)
+                .build(true) // ✅ 인코딩 관련 이슈 줄이기
+                .toUriString();
+    }
 
-    public String exchangeCodeToAccessToken(String code, String redirectUri) {
-        String ru = (redirectUri != null && !redirectUri.isBlank()) ? redirectUri : defaultRedirectUri;
+    public KakaoTokenResponse exchangeCodeToToken(String code) {
+        validateConfig();
+        if (code == null || code.isBlank()) {
+            throw new KakaoApiException("인가 코드(code)가 비어있습니다.");
+        }
 
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "authorization_code");
+            body.add("client_id", clientId);
+            body.add("redirect_uri", redirectUri);
+            body.add("code", code);
+            body.add("client_secret", clientSecret); // ✅ 필수로 항상 포함
+
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
+
+            // ✅ 민감정보 마스킹 로그 (client_secret 전체 노출 금지)
+            log.info("[KakaoToken] endpoint={}", tokenUri);
+            log.info("[KakaoToken] client_id={}, redirect_uri={}", mask(clientId, 6), redirectUri);
+            log.info("[KakaoToken] code={}", mask(code, 8));
+            log.info("[KakaoToken] client_secret_present={}", !clientSecret.isBlank());
+
+            ResponseEntity<KakaoTokenResponse> response = restTemplate.exchange(
+                    tokenUri,
+                    HttpMethod.POST,
+                    entity,
+                    KakaoTokenResponse.class
+            );
+
+            KakaoTokenResponse token = response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && token != null && token.accessToken() != null) {
+                return token;
+            }
+
+            throw new KakaoApiException("카카오 토큰 발급 실패: empty body or missing access_token");
+        } catch (HttpClientErrorException e) {
+            String respBody = e.getResponseBodyAsString();
+            log.error("[KakaoToken] fail status={}, body={}", e.getStatusCode(), (respBody == null || respBody.isBlank()) ? "<empty>" : respBody);
+            throw new KakaoApiException("카카오 토큰 발급 실패: " + e.getStatusCode(), e, e.getStatusCode().value());
+        } catch (Exception e) {
+            throw new KakaoApiException("카카오 토큰 발급 중 오류", e);
+        }
+    }
+
+    private void validateConfig() {
         if (clientId == null || clientId.isBlank()) {
-            throw new IllegalArgumentException("KAKAO_CLIENT_ID is required.");
+            throw new KakaoApiException("oauth.kakao.client-id 설정이 비어있습니다.");
         }
-        if (ru == null || ru.isBlank()) {
-            throw new IllegalArgumentException("KAKAO_REDIRECT_URI is required for code login.");
+        if (redirectUri == null || redirectUri.isBlank()) {
+            throw new KakaoApiException("oauth.kakao.redirect-uri 설정이 비어있습니다.");
         }
-
-        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("grant_type", "authorization_code");
-        form.add("client_id", clientId);
-        form.add("redirect_uri", ru);
-        form.add("code", code);
-
-        if (clientSecret != null && !clientSecret.isBlank()) {
-            form.add("client_secret", clientSecret);
-        }
-
-        String body = webClient.post()
-                .uri(tokenUri)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .accept(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromFormData(form))
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        try {
-            JsonNode node = objectMapper.readTree(body);
-            JsonNode accessToken = node.get("access_token");
-            if (accessToken == null) throw new IllegalArgumentException("Kakao token response missing access_token.");
-            return accessToken.asText();
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to parse kakao token response.");
+        if (clientSecret == null || clientSecret.isBlank()) {
+            throw new KakaoApiException("oauth.kakao.client-secret 설정이 비어있습니다. (현재 앱은 client_secret 필수)");
         }
     }
 
-    public KakaoUserInfo fetchUserInfo(String accessToken) {
-        String body = webClient.get()
-                .uri(userInfoUri)
-                .accept(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + accessToken)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
-
-        try {
-            JsonNode root = objectMapper.readTree(body);
-
-            String id = root.get("id").asText();
-
-            JsonNode kakaoAccount = root.get("kakao_account");
-            String email = null;
-            if (kakaoAccount != null && kakaoAccount.get("email") != null) {
-                email = kakaoAccount.get("email").asText();
-            }
-
-            String nickname = null;
-            JsonNode profile = (kakaoAccount != null) ? kakaoAccount.get("profile") : null;
-            if (profile != null && profile.get("nickname") != null) {
-                nickname = profile.get("nickname").asText();
-            }
-
-            return new KakaoUserInfo(id, email, nickname);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Failed to parse kakao user info.");
-        }
-    }
-
-    @Getter
-    public static class KakaoUserInfo {
-        private final String providerId;
-        private final String email;
-        private final String nickname;
-
-        public KakaoUserInfo(String providerId, String email, String nickname) {
-            this.providerId = providerId;
-            this.email = email;
-            this.nickname = nickname;
-        }
+    private String mask(String value, int keepPrefix) {
+        if (value == null) return "null";
+        if (value.length() <= keepPrefix) return value;
+        return value.substring(0, keepPrefix) + "****";
     }
 }
