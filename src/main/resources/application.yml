@@ -75,3 +75,15 @@ aws:
 app:
   swagger:
     prod-url: http://localhost:8080
+  dev-token:
+    enabled: ${DEV_TOKEN_ENABLED:false}
+
+oauth:
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:} # 없어도 되는 경우 많음(카카오 설정에 따라)
+    redirect-uri: ${KAKAO_REDIRECT_URI:}   # code 방식 쓸 때 필요
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+# 프론트가 “access token을 직접 넘겨주는 방식”이면 redirect-uri 없어도 됨.
+# 프론트가 “Authorization Code 방식”이면 redirect-uri가 반드시 필요.
