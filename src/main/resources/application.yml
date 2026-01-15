@@ -19,7 +19,6 @@ spring:
 
   jpa:
     hibernate:
-      # 로컬 테스트면 create / 운영이면 update 권장
       ddl-auto: ${DDL_AUTO:create}
     properties:
       hibernate:
@@ -58,6 +57,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
+    enabled: true
     path: /swagger-ui.html
     url: /v3/api-docs
     display-request-duration: true
@@ -69,11 +69,11 @@ jwt:
 
 aws:
   s3:
-    access-key: ${AWS_ACCESS_KEY:${AWS_ACCESS_KEY_ID:}}
-    secret-key: ${AWS_SECRET_KEY:${AWS_SECRET_ACCESS_KEY:}}
-    bucket-name: ${AWS_S3_BUCKET_NAME:${S3_BUCKETNAME:}}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    bucket-name: ${AWS_S3_BUCKET_NAME:}
     base-url: ${AWS_S3_BASE_URL:}
-    region: ${AWS_S3_REGION:${S3_REGION:ap-northeast-2}}
+    region: ${AWS_S3_REGION:ap-northeast-2}
 
 app:
   swagger:
@@ -88,4 +88,3 @@ oauth:
     redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/auth/kakao/callback}
     authorize-uri: https://kauth.kakao.com/oauth/authorize
     token-uri: https://kauth.kakao.com/oauth/token
-
