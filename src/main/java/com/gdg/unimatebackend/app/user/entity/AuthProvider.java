@@ -1,7 +1,10 @@
 package com.gdg.unimatebackend.app.user.entity;
 
+/**
+ * 소셜 로그인 제공자 타입
+ */
 public enum AuthProvider {
-    LOCAL,
-    KAKAO,
-    NAVER
+    EMAIL,      // 이메일 로그인
+    KAKAO       // 카카오 로그인
 }
+

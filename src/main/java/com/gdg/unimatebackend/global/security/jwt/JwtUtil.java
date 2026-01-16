@@ -16,20 +16,18 @@ public class JwtUtil {
     private final SecretKey secretKey;
     private final long expiration;
 
-    public JwtUtil(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration}") long expiration
-    ) {
+    public JwtUtil(@Value("${jwt.secret}") String secret, @Value("${jwt.expiration}") long expiration) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = expiration;
     }
 
-    public String generateToken(Long userId) {
+    public String generateToken(Long userId, String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
-                .subject(String.valueOf(userId)) // principal = userId
+                .subject(String.valueOf(userId))
+                .claim("email", email)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
@@ -41,10 +39,15 @@ public class JwtUtil {
         return Long.parseLong(claims.getSubject());
     }
 
+    public String getEmailFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.get("email", String.class);
+    }
+
     public boolean validateToken(String token) {
         try {
             Claims claims = getClaimsFromToken(token);
-            return claims.getExpiration().after(new Date());
+            return !claims.getExpiration().before(new Date());
         } catch (Exception e) {
             return false;
         }
@@ -57,9 +60,5 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload();
     }
-    public Long getUserId(String token) {
-        Claims claims = getClaimsFromToken(token);
-        String subject = claims.getSubject();
-        return Long.parseLong(subject);
-    }
 }
+
