@@ -1,31 +1,33 @@
 package com.gdg.unimatebackend.app.user.dto;
 
+import com.gdg.unimatebackend.app.user.entity.AuthProvider;
 import com.gdg.unimatebackend.app.user.entity.Gender;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserUpdateRequest {
-
-    @Size(max = 50, message = "닉네임은 50자 이하로 입력해주세요")
+public class UserResponse {
+    private Long id;
+    private String email;
     private String nickname;
-
-    @Size(max = 50, message = "이름은 50자 이하로 입력해주세요")
+    private Boolean emailVerified;
+    private AuthProvider provider;
+    private String providerId;
+    private Boolean active;
+    private String profileImageUrl;
     private String name;
-
     private LocalDate birthDate;
-
     private Gender gender;
-
-    @Size(max = 20, message = "연락처는 20자 이하로 입력해주세요")
     private String phoneNumber;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 
