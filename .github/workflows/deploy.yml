@@ -119,7 +119,9 @@ jobs:
             curl -I http://localhost:8080/v3/api-docs | head -n 5
 
             echo "=== check swagger-config (must be 200) ==="
-            curl -sf http://localhost:8080/v3/api-docs/swagger-config > /dev/null
+            echo "=== check swagger-config (debug) ==="
+            curl -iv http://localhost:8080/v3/api-docs/swagger-config | head -n 40
+
             echo "OK: swagger-config responding"
 
             echo "=== check swagger-ui redirect/ok ==="
