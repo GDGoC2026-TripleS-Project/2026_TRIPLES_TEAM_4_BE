@@ -71,7 +71,7 @@ jobs:
 
             docker pull "${IMAGE}"
 
-            # ✅ (최소 추가) 8080 포트 점유한 컨테이너/프로세스 정리
+            # ✅ 8080 포트 점유한 컨테이너/프로세스 정리
             echo "=== check who uses 8080 ==="
             sudo ss -ltnp | grep ':8080' || true
 
@@ -100,6 +100,8 @@ jobs:
               -e MAIL_USERNAME='${{ secrets.MAIL_USERNAME }}' \
               -e MAIL_PASSWORD='${{ secrets.MAIL_PASSWORD }}' \
               -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
+              -e KAKAO_CLIENT_ID='${{ secrets.KAKAO_CLIENT_ID }}' \
+              -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
               "${IMAGE}"
 
             for i in $(seq 1 30); do
