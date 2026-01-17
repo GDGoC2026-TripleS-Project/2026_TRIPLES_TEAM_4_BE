@@ -51,10 +51,17 @@ jobs:
       - name: Deploy (docker pull & run)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          port: ${{ secrets.EC2_PORT }}
+          # ✅ 최소 수정: secrets 우회해서 "정확한 SSH 대상"으로 고정
+          host: 54.180.31.79
+          username: ubuntu
+          port: 22
+
+          # ✅ 키는 그대로 사용
           key: ${{ secrets.EC2_SSH_KEY }}
+
+          # ✅ 로그에 접속/진행 정보 더 나오게
+          debug: true
+
           script: |
             set -e
 
@@ -100,13 +107,13 @@ jobs:
             done
 
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-  
+
             echo "=== check openapi ==="
             curl -I http://localhost:8080/v3/api-docs | head -n 5
-            
+
             echo "=== check swagger-config (must be 200) ==="
             curl -sf http://localhost:8080/v3/api-docs/swagger-config > /dev/null
             echo "OK: swagger-config responding"
-            
+
             echo "=== check swagger-ui redirect/ok ==="
             curl -I http://localhost:8080/swagger-ui.html | head -n 5
