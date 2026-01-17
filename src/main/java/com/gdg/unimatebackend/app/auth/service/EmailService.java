@@ -30,10 +30,10 @@ public class EmailService {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(email);
         message.setFrom(from); // 발신자 주소 미설정 시 "can't determine local email address" 오류 발생
-        message.setSubject("[Travodo] 이메일 인증 코드");
+        message.setSubject("[Unimate] 이메일 인증 코드");
         message.setText(
                 "안녕하세요.\n\n" +
-                        "Travodo 이메일 인증 코드입니다.\n\n" +
+                        "Unimate 이메일 인증 코드입니다.\n\n" +
                         "인증 코드: " + code + "\n\n" +
                         "이 코드는 10분간 유효합니다.\n\n" +
                         "본인이 요청한 것이 아니라면 이 메일을 무시하세요."
