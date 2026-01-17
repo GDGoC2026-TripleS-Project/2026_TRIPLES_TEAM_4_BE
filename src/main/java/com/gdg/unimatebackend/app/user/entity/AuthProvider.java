@@ -5,6 +5,7 @@ package com.gdg.unimatebackend.app.user.entity;
  */
 public enum AuthProvider {
     EMAIL,      // 이메일 로그인
-    KAKAO       // 카카오 로그인
+    KAKAO,       // 카카오 로그인
+    NAVER        // 네이버 로그인
 }
 

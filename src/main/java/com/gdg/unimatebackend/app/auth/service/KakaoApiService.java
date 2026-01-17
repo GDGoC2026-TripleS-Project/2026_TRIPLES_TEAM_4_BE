@@ -26,7 +26,7 @@ public class KakaoApiService implements InitializingBean {
     private final RestTemplate restTemplate;
     private final String kakaoApiBaseUrl = "https://kapi.kakao.com";
 
-    @Value("${kakao.rest-api-key:}")
+    @Value("${oauth.kakao.client-id:}")
     private String restApiKey;
 
     public KakaoApiService() {
