@@ -84,7 +84,7 @@ jobs:
             # 기존 이름 컨테이너도 정리
             docker rm -f "${{ env.CONTAINER_NAME }}" || true
 
-            docker run -d --name "${{ env.CONTAINER_NAME }}" \
+                        docker run -d --name "${{ env.CONTAINER_NAME }}" \
               --restart unless-stopped \
               -p 8080:8080 \
               -e TZ=Asia/Seoul \
@@ -102,6 +102,8 @@ jobs:
               -e S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
               -e KAKAO_CLIENT_ID='${{ secrets.KAKAO_CLIENT_ID }}' \
               -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
+              -e NAVER_CLIENT_ID='${{ secrets.NAVER_CLIENT_ID }}' \
+              -e NAVER_CLIENT_SECRET='${{ secrets.NAVER_CLIENT_SECRET }}' \
               "${IMAGE}"
 
             for i in $(seq 1 30); do
