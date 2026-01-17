@@ -121,35 +121,6 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/account/link")
-    @Operation(summary = "계정 통합", description = "기존 계정에 다른 로그인 방식을 통합합니다")
-    public ResponseEntity<AuthResponse> linkAccount(@Valid @RequestBody LinkAccountRequest request) {
-        AuthResponse response;
-
-        if (request.getExistingProvider() == AuthProvider.KAKAO) {
-            // 소셜 로그인 계정에 이메일 로그인 추가
-            response = authService.linkAccount(request);
-        } else if (request.getExistingProvider() == AuthProvider.EMAIL) {
-            // 이메일 계정에 소셜 로그인 추가는 소셜 로그인 시 처리
-            // 여기서는 카카오 providerId를 받아서 처리
-            throw new IllegalArgumentException("이메일 계정 통합은 소셜 로그인 시 처리됩니다");
-        } else {
-            throw new IllegalArgumentException("지원하지 않는 로그인 제공자입니다");
-        }
-
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/account/link/social")
-    @Operation(summary = "이메일 계정에 소셜 로그인 연동", description = "기존 이메일 계정에 소셜 로그인을 연동합니다")
-    public ResponseEntity<AuthResponse> linkSocialAccount(
-            @RequestParam String email,
-            @RequestParam AuthProvider provider,
-            @RequestParam String providerId) {
-        AuthResponse response = socialAuthService.linkSocialAccount(email, provider, providerId);
-        return ResponseEntity.ok(response);
-    }
-
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "현재 로그인한 사용자를 로그아웃합니다")
     public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
