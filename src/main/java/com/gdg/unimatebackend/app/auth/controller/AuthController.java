@@ -2,8 +2,10 @@ package com.gdg.unimatebackend.app.auth.controller;
 
 import com.gdg.unimatebackend.app.auth.dto.*;
 import com.gdg.unimatebackend.app.auth.service.AuthService;
+import com.gdg.unimatebackend.app.auth.service.KakaoApiService;
 import com.gdg.unimatebackend.app.auth.service.NaverApiService;
 import com.gdg.unimatebackend.app.auth.service.SocialAuthService;
+import com.gdg.unimatebackend.app.user.entity.AuthProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ public class AuthController {
     private final AuthService authService;
     private final SocialAuthService socialAuthService;
     private final NaverApiService naverApiService;
+    private final KakaoApiService kakaoApiService;
 
     @Value("${oauth.naver.client-id}")
     private String naverClientId;
@@ -38,6 +41,15 @@ public class AuthController {
     @Value("${oauth.naver.authorize-uri}")
     private String naverAuthorizeUri;
 
+    // ===== KAKAO =====
+    @Value("${oauth.kakao.client-id}")
+    private String kakaoClientId;
+
+    @Value("${oauth.kakao.redirect-uri}")
+    private String kakaoRedirectUri;
+
+    @Value("${oauth.kakao.authorize-uri}")
+    private String kakaoAuthorizeUri;
 
     @PostMapping("/email/verification/send")
     @Operation(summary = "이메일 인증번호 전송", description = "이메일로 인증번호를 전송합니다")
@@ -124,7 +136,7 @@ public class AuthController {
     }
 
     @PostMapping("/social/login")
-    @Operation(summary = "소셜 로그인", description = "카카오 로그인을 처리합니다")
+    @Operation(summary = "소셜 로그인", description = "accessToken 기반 소셜 로그인을 처리합니다")
     public ResponseEntity<AuthResponse> socialLogin(@Valid @RequestBody SocialLoginRequest request) {
         AuthResponse response = socialAuthService.socialLogin(
                 request.getProvider(),
@@ -138,8 +150,6 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "현재 로그인한 사용자를 로그아웃합니다")
     public ResponseEntity<Map<String, String>> logout(Authentication authentication) {
-        // JWT는 stateless이므로 클라이언트에서 토큰을 삭제하면 됩니다.
-        // 필요시 토큰 블랙리스트 기능을 추가할 수 있습니다.
         Map<String, String> response = new HashMap<>();
         response.put("message", "로그아웃되었습니다");
         return ResponseEntity.ok(response);
@@ -169,16 +179,57 @@ public class AuthController {
     ) {
         var tokenRes = naverApiService.exchangeCodeToToken(code, state, naverRedirectUri);
         if (tokenRes == null || tokenRes.accessToken() == null) {
-            throw new IllegalArgumentException("네이버 토큰 교환 실패: " + (tokenRes == null ? "null" : tokenRes.errorDescription()));
+            throw new IllegalArgumentException("네이버 토큰 교환 실패: " +
+                    (tokenRes == null ? "null" : tokenRes.errorDescription()));
         }
 
         AuthResponse response = socialAuthService.socialLogin(
-                com.gdg.unimatebackend.app.user.entity.AuthProvider.NAVER,
+                AuthProvider.NAVER,
                 tokenRes.accessToken(),
                 null,
                 null
         );
         return ResponseEntity.ok(response);
     }
-}
 
+    @GetMapping("/kakao/authorize-url")
+    public ResponseEntity<Map<String, String>> kakaoAuthorizeUrl() {
+        String state = UUID.randomUUID().toString();
+
+        String url = UriComponentsBuilder
+                .fromUriString(kakaoAuthorizeUri)
+                .queryParam("response_type", "code")
+                .queryParam("client_id", kakaoClientId)
+                .queryParam("redirect_uri", kakaoRedirectUri)
+                .queryParam("state", state)
+                .toUriString();
+
+        Map<String, String> res = new HashMap<>();
+        res.put("authorizeUrl", url);
+        res.put("state", state);
+        return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/kakao/callback")
+    public ResponseEntity<AuthResponse> kakaoCallback(
+            @RequestParam String code,
+            @RequestParam(required = false) String state
+    ) {
+        // 1) code -> kakao access_token
+        KakaoApiService.KakaoTokenResponse tokenRes = kakaoApiService.exchangeCodeToToken(code, kakaoRedirectUri);
+
+        if (tokenRes == null || tokenRes.getAccessToken() == null || tokenRes.getAccessToken().isBlank()) {
+            String reason = (tokenRes == null) ? "null" : (tokenRes.getErrorDescription() != null ? tokenRes.getErrorDescription() : tokenRes.getError());
+            throw new IllegalArgumentException("카카오 토큰 교환 실패: " + reason);
+        }
+
+        // 2) kakao access_token -> 우리 JWT 발급
+        AuthResponse response = socialAuthService.socialLogin(
+                AuthProvider.KAKAO,
+                tokenRes.getAccessToken(),
+                null,
+                null
+        );
+        return ResponseEntity.ok(response);
+    }
+}
