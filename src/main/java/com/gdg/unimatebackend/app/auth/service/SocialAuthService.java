@@ -59,7 +59,7 @@ public class SocialAuthService {
             log.info("카카오 로그인 - 기존 사용자: {}", user.getEmail());
         } else {
             // 이메일로 이미 가입된 사용자가 있는지 확인 (계정 통합)
-            if (email != null && !email.isEmpty() && !email.contains("@travodo.local")) {
+            if (email != null && !email.isEmpty() && !email.contains("@Unimate.local")) {
                 Optional<User> emailUserOpt = userRepository.findByEmail(email);
                 if (emailUserOpt.isPresent()) {
                     User emailUser = emailUserOpt.get();
@@ -153,7 +153,7 @@ public class SocialAuthService {
      * @return 대체 이메일 주소
      */
     private String generateAlternativeEmail(AuthProvider provider, String providerId) {
-        return provider.name().toLowerCase() + "_" + providerId + "@travodo.local";
+        return provider.name().toLowerCase() + "_" + providerId + "@Unimate.local";
     }
 
     /**
