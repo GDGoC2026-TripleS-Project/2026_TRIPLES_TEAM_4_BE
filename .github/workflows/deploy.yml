@@ -71,7 +71,7 @@ jobs:
 
             docker pull "${IMAGE}"
 
-            # ✅ 8080 포트 점유한 컨테이너/프로세스 정리
+            # ✅ 8080 포트 점유 정리
             echo "=== check who uses 8080 ==="
             sudo ss -ltnp | grep ':8080' || true
 
@@ -81,10 +81,9 @@ jobs:
             echo "=== check again ==="
             sudo ss -ltnp | grep ':8080' || true
 
-            # 기존 이름 컨테이너도 정리
             docker rm -f "${{ env.CONTAINER_NAME }}" || true
 
-                        docker run -d --name "${{ env.CONTAINER_NAME }}" \
+            docker run -d --name "${{ env.CONTAINER_NAME }}" \
               --restart unless-stopped \
               -p 8080:8080 \
               -e TZ=Asia/Seoul \
@@ -104,6 +103,8 @@ jobs:
               -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
               -e NAVER_CLIENT_ID='${{ secrets.NAVER_CLIENT_ID }}' \
               -e NAVER_CLIENT_SECRET='${{ secrets.NAVER_CLIENT_SECRET }}' \
+              -e SPRINGDOC_API_DOCS_ENABLED=true \
+              -e SPRINGDOC_SWAGGER_UI_ENABLED=true \
               "${IMAGE}"
 
             for i in $(seq 1 30); do
@@ -118,13 +119,7 @@ jobs:
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
             echo "=== check openapi ==="
-            curl -I http://localhost:8080/v3/api-docs | head -n 5
+            curl -I http://127.0.0.1:8080/v3/api-docs | head -n 10
 
-            echo "=== check swagger-config (must be 200) ==="
-            echo "=== check swagger-config (debug) ==="
-            curl -iv http://localhost:8080/v3/api-docs/swagger-config | head -n 40
-
-            echo "OK: swagger-config responding"
-
-            echo "=== check swagger-ui redirect/ok ==="
-            curl -I http://localhost:8080/swagger-ui.html | head -n 5
+            echo "=== check swagger-ui index ==="
+            curl -I http://127.0.0.1:8080/swagger-ui/index.html | head -n 10
