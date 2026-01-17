@@ -51,17 +51,11 @@ jobs:
       - name: Deploy (docker pull & run)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          # ✅ 최소 수정: secrets 우회해서 "정확한 SSH 대상"으로 고정
           host: 54.180.31.79
           username: ubuntu
           port: 22
-
-          # ✅ 키는 그대로 사용
           key: ${{ secrets.EC2_SSH_KEY }}
-
-          # ✅ 로그에 접속/진행 정보 더 나오게
           debug: true
-
           script: |
             set -e
 
@@ -77,6 +71,17 @@ jobs:
 
             docker pull "${IMAGE}"
 
+            # ✅ (최소 추가) 8080 포트 점유한 컨테이너/프로세스 정리
+            echo "=== check who uses 8080 ==="
+            sudo ss -ltnp | grep ':8080' || true
+
+            echo "=== stop containers publishing 8080 ==="
+            docker ps --filter "publish=8080" -q | xargs -r docker rm -f
+
+            echo "=== check again ==="
+            sudo ss -ltnp | grep ':8080' || true
+
+            # 기존 이름 컨테이너도 정리
             docker rm -f "${{ env.CONTAINER_NAME }}" || true
 
             docker run -d --name "${{ env.CONTAINER_NAME }}" \
