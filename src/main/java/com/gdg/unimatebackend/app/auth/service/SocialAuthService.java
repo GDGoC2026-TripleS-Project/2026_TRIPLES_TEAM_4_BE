@@ -22,15 +22,19 @@ public class SocialAuthService {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final KakaoApiService kakaoApiService;
+    private final NaverApiService naverApiService;
 
     @Transactional
     public AuthResponse socialLogin(AuthProvider provider, String accessToken, String email, String nickname) {
         if (provider == AuthProvider.KAKAO) {
             return kakaoLogin(accessToken);
+        } else if (provider == AuthProvider.NAVER) {
+            return naverLogin(accessToken);
         } else {
             throw new UnsupportedOperationException("지원하지 않는 소셜 로그인 제공자입니다: " + provider);
         }
     }
+
 
     /**
      * 카카오 로그인 처리
@@ -195,5 +199,47 @@ public class SocialAuthService {
                 .nickname(existingUser.getNickname())
                 .build();
     }
+
+    private AuthResponse naverLogin(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("네이버 accessToken이 필요합니다");
+        }
+
+        var naverUserInfo = naverApiService.getUserInfo(accessToken);
+        if (naverUserInfo == null || naverUserInfo.response() == null || naverUserInfo.response().id() == null) {
+            throw new IllegalArgumentException("네이버 사용자 정보 조회 실패");
+        }
+
+        String providerId = naverUserInfo.response().id();          // 고유값
+        String email = naverUserInfo.response().email();            // 연락처 이메일(없을 수 있음)
+        String nickname = naverUserInfo.response().nickname();      // 없을 수 있음
+        String profileImage = naverUserInfo.response().profileImage();
+        String name = naverUserInfo.response().name();
+
+        Optional<User> existingUserOpt = userRepository.findByProviderAndProviderId(AuthProvider.NAVER, providerId);
+
+        User user;
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            if (!user.getActive()) throw new IllegalArgumentException("탈퇴한 계정입니다");
+        } else {
+            // 이메일 기반 계정 통합 로직은 "연락처 이메일"이라 신뢰도가 낮아서 MVP에서는 강제 통합 비추천
+            user = createSocialUser(AuthProvider.NAVER, providerId, email, (nickname == null || nickname.isBlank()) ? "네이버사용자" : nickname);
+
+            // 선택 정보 업데이트(있을 때만)
+            if (profileImage != null && !profileImage.isBlank()) user.updateProfileImageUrl(profileImage);
+            if (name != null && !name.isBlank()) user.updateProfile(name, null, null, null);
+        }
+
+        String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+
+        return AuthResponse.builder()
+                .token(token)
+                .userId(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .build();
+    }
+
 }
 

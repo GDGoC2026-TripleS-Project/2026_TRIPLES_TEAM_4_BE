@@ -2,19 +2,22 @@ package com.gdg.unimatebackend.app.auth.controller;
 
 import com.gdg.unimatebackend.app.auth.dto.*;
 import com.gdg.unimatebackend.app.auth.service.AuthService;
+import com.gdg.unimatebackend.app.auth.service.NaverApiService;
 import com.gdg.unimatebackend.app.auth.service.SocialAuthService;
-import com.gdg.unimatebackend.app.user.entity.AuthProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,6 +27,17 @@ public class AuthController {
 
     private final AuthService authService;
     private final SocialAuthService socialAuthService;
+    private final NaverApiService naverApiService;
+
+    @Value("${oauth.naver.client-id}")
+    private String naverClientId;
+
+    @Value("${oauth.naver.redirect-uri}")
+    private String naverRedirectUri;
+
+    @Value("${oauth.naver.authorize-uri}")
+    private String naverAuthorizeUri;
+
 
     @PostMapping("/email/verification/send")
     @Operation(summary = "이메일 인증번호 전송", description = "이메일로 인증번호를 전송합니다")
@@ -128,6 +142,42 @@ public class AuthController {
         // 필요시 토큰 블랙리스트 기능을 추가할 수 있습니다.
         Map<String, String> response = new HashMap<>();
         response.put("message", "로그아웃되었습니다");
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/naver/authorize-url")
+    public ResponseEntity<Map<String, String>> naverAuthorizeUrl() {
+        String state = UUID.randomUUID().toString(); // MVP: 서버 저장/검증은 생략
+        String url = UriComponentsBuilder
+                .fromUriString(naverAuthorizeUri)
+                .queryParam("response_type", "code")
+                .queryParam("client_id", naverClientId)
+                .queryParam("redirect_uri", naverRedirectUri)
+                .queryParam("state", state)
+                .toUriString();
+
+        Map<String, String> res = new HashMap<>();
+        res.put("authorizeUrl", url);
+        res.put("state", state);
+        return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/naver/callback")
+    public ResponseEntity<AuthResponse> naverCallback(
+            @RequestParam String code,
+            @RequestParam String state
+    ) {
+        var tokenRes = naverApiService.exchangeCodeToToken(code, state, naverRedirectUri);
+        if (tokenRes == null || tokenRes.accessToken() == null) {
+            throw new IllegalArgumentException("네이버 토큰 교환 실패: " + (tokenRes == null ? "null" : tokenRes.errorDescription()));
+        }
+
+        AuthResponse response = socialAuthService.socialLogin(
+                com.gdg.unimatebackend.app.user.entity.AuthProvider.NAVER,
+                tokenRes.accessToken(),
+                null,
+                null
+        );
         return ResponseEntity.ok(response);
     }
 }
