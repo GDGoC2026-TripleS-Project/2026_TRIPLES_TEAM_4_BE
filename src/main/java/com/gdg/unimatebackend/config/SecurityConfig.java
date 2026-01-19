@@ -55,46 +55,32 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration c = new CorsConfiguration();
 
-        // ✅ 로컬 개발
-        configuration.addAllowedOriginPattern("http://localhost:*");
-        configuration.addAllowedOriginPattern("http://127.0.0.1:*");
+        // 로컬 개발
+        c.addAllowedOriginPattern("http://localhost:*");
+        c.addAllowedOriginPattern("http://127.0.0.1:*");
 
-        // ✅ 운영(duckdns)
-        configuration.addAllowedOriginPattern("https://seok-hwan1.duckdns.org");
-        configuration.addAllowedOriginPattern("http://seok-hwan1.duckdns.org");
+        // 운영 (duckdns)
+        c.addAllowedOriginPattern("https://seok-hwan1.duckdns.org");
+        c.addAllowedOriginPattern("http://seok-hwan1.duckdns.org");
 
-        // ✅ 프론트 URL이 있으면 추가로 허용 (있으면 좋고 없어도 OK)
-        if (frontendUrl != null && !frontendUrl.isEmpty()) {
-            configuration.addAllowedOriginPattern(frontendUrl);
-
-            String urlWithoutWww = frontendUrl.replace("www.", "");
-            if (!urlWithoutWww.equals(frontendUrl)) {
-                configuration.addAllowedOriginPattern(urlWithoutWww);
-            }
-
-            if (frontendUrl.contains("://")) {
-                String[] parts = frontendUrl.split("://");
-                if (parts.length == 2) {
-                    String domain = parts[1];
-                    configuration.addAllowedOriginPattern("https://*" + domain);
-                    configuration.addAllowedOriginPattern("http://*" + domain);
-                }
-            }
+        // 선택: 프론트 URL이 환경변수로 들어오는 경우
+        if (frontendUrl != null && !frontendUrl.isBlank()) {
+            c.addAllowedOriginPattern(frontendUrl);
         }
 
-        configuration.addAllowedHeader("*");
-        configuration.addAllowedMethod("*");
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        c.addAllowedHeader("*");
+        c.addAllowedMethod("*");
+        c.setAllowCredentials(true);
+        c.setExposedHeaders(Arrays.asList("Authorization"));
+        c.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-
+        source.registerCorsConfiguration("/**", c);
         return source;
     }
+
 
     @Bean
     public PasswordEncoder passwordEncoder() {

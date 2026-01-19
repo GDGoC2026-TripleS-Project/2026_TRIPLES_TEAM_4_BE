@@ -3,7 +3,7 @@ package com.gdg.unimatebackend.app.auth.service;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.gdg.unimatebackend.global.exception.KakaoApiException;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,179 +13,133 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * 카카오 API 호출 서비스
- * 카카오 액세스 토큰을 검증하고 사용자 정보를 가져옵니다.
- */
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class KakaoApiService implements InitializingBean {
 
     private final RestTemplate restTemplate;
-    private final String kakaoApiBaseUrl = "https://kapi.kakao.com";
 
-    // 카카오 OAuth 토큰 교환 엔드포인트
-    @Value("${oauth.kakao.token-uri:https://kauth.kakao.com/oauth/token}")
-    private String tokenUri;
-
-    // 카카오 REST API Key (client_id)
     @Value("${oauth.kakao.client-id:}")
-    private String restApiKey;
+    private String clientId;
 
-    // 카카오 앱 설정에 따라 필요할 수도/없을 수도 있어 optional 처리
     @Value("${oauth.kakao.client-secret:}")
     private String clientSecret;
 
-    public KakaoApiService() {
-        this.restTemplate = new RestTemplate();
-    }
+    @Value("${oauth.kakao.authorize-uri:https://kauth.kakao.com/oauth/authorize}")
+    private String authorizeUri;
+
+    @Value("${oauth.kakao.token-uri:https://kauth.kakao.com/oauth/token}")
+    private String tokenUri;
+
+    @Value("${oauth.kakao.user-info-uri:https://kapi.kakao.com/v2/user/me}")
+    private String userInfoUri;
+
+    @Value("${oauth.kakao.redirect-uri}")
+    private String redirectUri;
 
     @Override
     public void afterPropertiesSet() {
-        if (restApiKey == null || restApiKey.isEmpty()) {
-            log.warn("카카오 REST API 키가 설정되지 않았습니다. 카카오 로그인이 작동하지 않을 수 있습니다.");
+        if (clientId == null || clientId.isBlank()) {
+            log.warn("Kakao client-id is empty. Kakao login may not work.");
         } else {
-            log.info("카카오 REST API 키가 설정되었습니다. (키: {}...)", restApiKey.substring(0, Math.min(8, restApiKey.length())));
+            log.info("Kakao client-id loaded. ({}...)", clientId.substring(0, Math.min(8, clientId.length())));
         }
     }
 
-    // =========================
-    // code -> access_token 교환
-    // =========================
+    public String buildAuthorizeUrl(String state) {
+        return UriComponentsBuilder.fromUriString(authorizeUri)
+                .queryParam("response_type", "code")
+                .queryParam("client_id", clientId)
+                .queryParam("redirect_uri", redirectUri)
+                .queryParam("state", state)
+                .toUriString();
+    }
+
+    public KakaoTokenResponse exchangeCodeForToken(String code) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("grant_type", "authorization_code");
+            form.add("client_id", clientId);
+            form.add("redirect_uri", redirectUri);
+            form.add("code", code);
+
+            if (clientSecret != null && !clientSecret.isBlank()) {
+                form.add("client_secret", clientSecret);
+            }
+
+            ResponseEntity<KakaoTokenResponse> res = restTemplate.exchange(
+                    tokenUri,
+                    HttpMethod.POST,
+                    new HttpEntity<>(form, headers),
+                    KakaoTokenResponse.class
+            );
+
+            KakaoTokenResponse body = res.getBody();
+            if (res.getStatusCode().is2xxSuccessful() && body != null && body.accessToken != null && !body.accessToken.isBlank()) {
+                return body;
+            }
+
+            throw new KakaoApiException("Kakao token exchange failed", null, res.getStatusCode().value());
+        } catch (HttpClientErrorException e) {
+            throw new KakaoApiException("Kakao token exchange http error: " + e.getStatusCode(), e, e.getStatusCode().value());
+        }
+    }
+
+    public KakaoUserInfo fetchUserInfo(String accessToken) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            ResponseEntity<KakaoUserInfo> res = restTemplate.exchange(
+                    userInfoUri,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    KakaoUserInfo.class
+            );
+
+            KakaoUserInfo body = res.getBody();
+            if (res.getStatusCode().is2xxSuccessful() && body != null && body.id != null) {
+                return body;
+            }
+            throw new KakaoApiException("Kakao userinfo fetch failed", null, res.getStatusCode().value());
+        } catch (HttpClientErrorException e) {
+            throw new KakaoApiException("Kakao userinfo http error: " + e.getStatusCode(), e, e.getStatusCode().value());
+        }
+    }
+
+    public String getRedirectUri() {
+        return redirectUri;
+    }
+
+    // ===== DTOs =====
 
     @Getter
-    @Setter
     public static class KakaoTokenResponse {
         @JsonProperty("access_token")
         private String accessToken;
-
-        @JsonProperty("token_type")
-        private String tokenType;
-
         @JsonProperty("refresh_token")
         private String refreshToken;
-
+        @JsonProperty("token_type")
+        private String tokenType;
         @JsonProperty("expires_in")
         private Integer expiresIn;
-
         @JsonProperty("scope")
         private String scope;
 
         @JsonProperty("error")
         private String error;
-
         @JsonProperty("error_description")
         private String errorDescription;
     }
 
-    /**
-     * 인가 코드(code)를 카카오 access_token으로 교환
-     */
-    public KakaoTokenResponse exchangeCodeToToken(String code, String redirectUri) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "authorization_code");
-            body.add("client_id", restApiKey);
-            body.add("redirect_uri", redirectUri);
-            body.add("code", code);
-
-            // client_secret을 쓰는 앱이면 추가
-            if (clientSecret != null && !clientSecret.isBlank()) {
-                body.add("client_secret", clientSecret);
-            }
-
-            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
-
-            ResponseEntity<KakaoTokenResponse> response = restTemplate.exchange(
-                    tokenUri,
-                    HttpMethod.POST,
-                    entity,
-                    KakaoTokenResponse.class
-            );
-
-            KakaoTokenResponse res = response.getBody();
-            if (response.getStatusCode().is2xxSuccessful() && res != null && res.getAccessToken() != null) {
-                return res;
-            }
-
-            throw new KakaoApiException("카카오 토큰 교환 실패", null,
-                    response.getStatusCode().value());
-        } catch (HttpClientErrorException e) {
-            log.error("카카오 토큰 교환 HTTP 오류 ({}): {}", e.getStatusCode(), e.getMessage());
-            log.error("응답 본문: {}", e.getResponseBodyAsString());
-            throw new KakaoApiException(
-                    "카카오 토큰 교환 중 오류가 발생했습니다: " + e.getStatusCode(),
-                    e,
-                    e.getStatusCode().value()
-            );
-        } catch (Exception e) {
-            log.error("카카오 토큰 교환 중 오류 발생: {}", e.getMessage(), e);
-            throw new KakaoApiException("카카오 토큰 교환 중 오류가 발생했습니다", e);
-        }
-    }
-
-    /**
-     * 카카오 액세스 토큰으로 사용자 정보 조회
-     *
-     * @param accessToken 카카오 액세스 토큰
-     * @return 카카오 사용자 정보
-     * @throws RuntimeException 토큰이 유효하지 않거나 API 호출 실패 시
-     */
-    public KakaoUserInfo getUserInfo(String accessToken) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + accessToken);
-            headers.set("Content-Type", "application/x-www-form-urlencoded;charset=utf-8");
-
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-
-            String url = kakaoApiBaseUrl + "/v2/user/me?property_keys=[\"kakao_account.email\"]";
-            ResponseEntity<KakaoUserInfo> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    entity,
-                    KakaoUserInfo.class
-            );
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return response.getBody();
-            }
-
-            throw new RuntimeException("카카오 사용자 정보 조회 실패");
-        } catch (HttpClientErrorException.Unauthorized e) {
-            log.error("카카오 액세스 토큰이 유효하지 않습니다: {}", e.getMessage());
-            throw new KakaoApiException("유효하지 않은 카카오 액세스 토큰입니다", e, 401);
-        } catch (HttpClientErrorException.Forbidden e) {
-            log.error("카카오 API 호출 권한 오류 (403): {}", e.getMessage());
-            log.error("응답 본문: {}", e.getResponseBodyAsString());
-            throw new KakaoApiException(
-                    "카카오 로그인 권한이 없습니다. 카카오 개발자 콘솔에서 플랫폼 등록 및 카카오 로그인 제품 활성화를 확인해주세요.",
-                    e,
-                    403
-            );
-        } catch (HttpClientErrorException e) {
-            log.error("카카오 API HTTP 오류 ({}): {}", e.getStatusCode(), e.getMessage());
-            log.error("응답 본문: {}", e.getResponseBodyAsString());
-            throw new KakaoApiException(
-                    "카카오 API 호출 중 오류가 발생했습니다: " + e.getStatusCode(),
-                    e,
-                    e.getStatusCode().value()
-            );
-        } catch (Exception e) {
-            log.error("카카오 API 호출 중 오류 발생: {}", e.getMessage(), e);
-            throw new KakaoApiException("카카오 사용자 정보 조회 중 오류가 발생했습니다", e);
-        }
-    }
-
-    /**
-     * 카카오 API 응답 DTO
-     */
     @Getter
-    @Setter
     public static class KakaoUserInfo {
         private Long id;
 
@@ -196,48 +150,31 @@ public class KakaoApiService implements InitializingBean {
         private KakaoProperties properties;
 
         @Getter
-        @Setter
         public static class KakaoAccount {
             private String email;
-            private Boolean emailNeedsAgreement;
-            private Boolean isEmailValid;
-            private Boolean isEmailVerified;
 
             @JsonProperty("profile")
             private KakaoProfile profile;
 
             @Getter
-            @Setter
             public static class KakaoProfile {
                 private String nickname;
-                @JsonProperty("profile_image_url")
-                private String profileImageUrl;
             }
         }
 
         @Getter
-        @Setter
         public static class KakaoProperties {
             private String nickname;
-            @JsonProperty("profile_image")
-            private String profileImage;
         }
 
-        public String getEmail() {
-            if (kakaoAccount != null && kakaoAccount.getEmail() != null) {
-                return kakaoAccount.getEmail();
-            }
-            return null;
+        public String email() {
+            return (kakaoAccount != null) ? kakaoAccount.email : null;
         }
 
-        public String getNickname() {
-            if (properties != null && properties.getNickname() != null) {
-                return properties.getNickname();
-            }
-            if (kakaoAccount != null && kakaoAccount.getProfile() != null
-                    && kakaoAccount.getProfile().getNickname() != null) {
-                return kakaoAccount.getProfile().getNickname();
-            }
+        public String nicknameOrDefault() {
+            if (properties != null && properties.nickname != null && !properties.nickname.isBlank()) return properties.nickname;
+            if (kakaoAccount != null && kakaoAccount.profile != null && kakaoAccount.profile.nickname != null && !kakaoAccount.profile.nickname.isBlank())
+                return kakaoAccount.profile.nickname;
             return "카카오사용자";
         }
     }
