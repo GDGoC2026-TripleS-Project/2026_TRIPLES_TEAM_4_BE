@@ -86,14 +86,14 @@ app:
 oauth:
   kakao:
     client-id: ${KAKAO_CLIENT_ID:f0090451b3aedc13683fc670394f8de8}
-    client-secret: ${KAKAO_CLIENT_SECRET:}
+    client-secret: ${KAKAO_CLIENT_SECRET:R9E7xGESxXIk9Q8HVfh2nu8adIUsOpaA}
     redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/auth/kakao/callback}
     authorize-uri: https://kauth.kakao.com/oauth/authorize
     token-uri: https://kauth.kakao.com/oauth/token
 
   naver:
     client-id: ${NAVER_CLIENT_ID:Ze3_z_ELhRaAGd_SNrhm}
-    client-secret: ${NAVER_CLIENT_SECRET:}
+    client-secret: ${NAVER_CLIENT_SECRET:QoMkLUvbur}
     redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8080/api/auth/naver/callback}
     authorize-uri: https://nid.naver.com/oauth2.0/authorize
     token-uri: https://nid.naver.com/oauth2.0/token

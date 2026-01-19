@@ -10,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -44,6 +45,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        AntPathMatcher matcher = new AntPathMatcher();
+
+        return matcher.match("/api/auth/**", uri)
+                || matcher.match("/api/system/**", uri)
+                || matcher.match("/swagger-ui/**", uri)
+                || matcher.match("/v3/api-docs/**", uri)
+                || matcher.match("/swagger-ui.html", uri)
+                || matcher.match("/error", uri);
     }
 }
 
