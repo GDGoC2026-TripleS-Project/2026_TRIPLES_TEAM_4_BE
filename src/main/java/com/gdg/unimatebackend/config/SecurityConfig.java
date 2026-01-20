@@ -42,16 +42,18 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ 프리플라이트(앱/브라우저에서 OPTIONS 먼저 날아오는 경우)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+
                         // ✅ 기존 허용 경로
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/system/**").permitAll()
 
-                        // ✅ FCM 디버그/테스트용 경로 허용 (여기 추가)
-                        // - 지금 Postman에서 401 뜨는 문제 해결
-                        // - 서버만으로 access-token 발급/더미 전송 확인 가능
+                        // ✅ FCM 디버그
                         .requestMatchers("/api/v1/fcm/debug/**").permitAll()
-                        // 선택: 실제 전송도 인증 없이 임시로 열고 싶으면 아래 주석 해제
-                        // .requestMatchers("/api/v1/fcm/send").permitAll()
+
+                        // ✅ (추가) Android 토큰 등록 API - 테스트 단계에서만 먼저 오픈
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/fcm/tokens").permitAll()
 
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
