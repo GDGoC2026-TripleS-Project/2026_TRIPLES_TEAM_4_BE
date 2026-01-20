@@ -31,3 +31,8 @@ oauth:
     token-uri: https://nid.naver.com/oauth2.0/token
     redirect-uri: https://seok-hwan1.duckdns.org/api/auth/naver/callback
 
+fcm:
+  project-id: unimate-1d1d1
+  key-path: /app/firebase-key.json
+
+
