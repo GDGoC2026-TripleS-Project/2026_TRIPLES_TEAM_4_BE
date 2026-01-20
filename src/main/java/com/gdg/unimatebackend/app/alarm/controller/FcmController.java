@@ -1,13 +1,17 @@
-// ✅ FcmController.java (서버만으로 검증 가능한 디버그 엔드포인트 포함 "풀버전")
-// package 경로는 네 프로젝트에 맞춰 그대로 유지
-
 package com.gdg.unimatebackend.app.alarm.controller;
 
 import com.gdg.unimatebackend.app.alarm.dto.FcmSendDto;
+import com.gdg.unimatebackend.app.alarm.dto.FcmTestSendRequest;
+import com.gdg.unimatebackend.app.alarm.dto.FcmTokenRegisterRequest;
+import com.gdg.unimatebackend.app.alarm.entity.FcmDeviceToken;
+import com.gdg.unimatebackend.app.alarm.repository.FcmDeviceTokenRepository;
 import com.gdg.unimatebackend.app.alarm.service.FcmService;
+import com.gdg.unimatebackend.app.alarm.service.FcmTokenService;
+import com.gdg.unimatebackend.app.alarm.support.UserIdResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,45 +19,77 @@ import java.io.IOException;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/fcm")
 @RequiredArgsConstructor
+@RequestMapping("/api/v1/fcm")
 public class FcmController {
 
     private final FcmService fcmService;
+    private final FcmTokenService fcmTokenService;
+    private final FcmDeviceTokenRepository tokenRepository;
+    private final UserIdResolver userIdResolver;
 
     /**
-     * ✅ 1) 서버만으로 "키 파일 로딩 + OAuth AccessToken 발급" 확인
-     * - 프론트 토큰 없어도 됨
+     * ✅ 앱 → 서버: 토큰 등록
+     * - 지금은 테스트 편하게 X-USER-ID 헤더로 userId 받음
      */
-    @GetMapping("/debug/access-token")
-    public ResponseEntity<String> debugAccessToken() throws IOException {
-        String accessToken = fcmService.getAccessTokenForDebug();
-
-        // 로그에는 마스킹 유지 (좋은 습관)
-        String masked = accessToken.length() > 20 ? accessToken.substring(0, 20) + "..." : accessToken;
-        log.info("[FCM DEBUG] accessToken(masked)={}", masked);
-
-        // 응답은 전체 반환
-        return ResponseEntity.ok(accessToken);
+    @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> registerToken(
+            @RequestHeader(value = "X-USER-ID", required = false) String headerUserId,
+            @Valid @RequestBody FcmTokenRegisterRequest request
+    ) {
+        Long userId = userIdResolver.resolveOrThrow(headerUserId);
+        fcmTokenService.register(userId, request);
+        return ResponseEntity.ok().build();
     }
 
     /**
-     * ✅ 2) 서버만으로 "FCM HTTP v1 호출"이 되는지 확인
-     * - token이 가짜여도 됨 (그 경우 400 INVALID_ARGUMENT이 정상적인 결과)
-     * - 401/403이면 인증/권한/프로젝트ID/키파일 문제가 있는 것
+     * ✅ 서버 단독: 내 저장된 토큰으로 템플릿 발송
+     * - body/title 없으면 기본값
      */
-    @PostMapping("/debug/send-dummy")
+    @PostMapping(value = "/test/me", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> testSendToMe(
+            @RequestHeader(value = "X-USER-ID", required = false) String headerUserId,
+            @RequestBody(required = false) FcmTestSendRequest request
+    ) throws IOException {
+
+        Long userId = userIdResolver.resolveOrThrow(headerUserId);
+
+        FcmDeviceToken token = tokenRepository.findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(userId)
+                .orElseThrow(() -> new IllegalStateException("No active FCM token for userId=" + userId));
+
+        String title = (request == null || request.getTitle() == null || request.getTitle().isBlank())
+                ? "Unimate Test"
+                : request.getTitle();
+
+        String body = (request == null || request.getBody() == null || request.getBody().isBlank())
+                ? "서버 템플릿 발송 테스트"
+                : request.getBody();
+
+        String result = fcmService.sendMessageTo(FcmSendDto.builder()
+                .token(token.getToken())
+                .title(title)
+                .body(body)
+                .build());
+
+        return ResponseEntity.ok(result);
+    }
+
+    // ====== 기존 디버그 (유지) ======
+
+    @GetMapping(value = "/debug/access-token", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> debugAccessToken() throws IOException {
+        String accessToken = fcmService.getAccessTokenForDebug();
+        return ResponseEntity.ok(accessToken);
+    }
+
+    @PostMapping(value = "/debug/send-dummy", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> sendDummy() throws IOException {
         String result = fcmService.sendDummyMessageForDebug();
         return ResponseEntity.ok(result);
     }
 
-    /**
-     * ✅ 3) 실제 전송 API (토큰이 있을 때)
-     * - Swagger에서 body로 token/title/body 넣어서 호출
-     */
-    @PostMapping("/debug/send")
-    public ResponseEntity<String> send(@RequestBody @Valid FcmSendDto dto) throws IOException {
+    @PostMapping(value = "/debug/send", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> send(@RequestBody FcmSendDto dto) throws IOException {
         String result = fcmService.sendMessageTo(dto);
         return ResponseEntity.ok(result);
     }

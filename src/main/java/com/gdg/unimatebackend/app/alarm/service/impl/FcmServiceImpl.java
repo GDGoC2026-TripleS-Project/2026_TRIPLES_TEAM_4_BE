@@ -2,7 +2,6 @@ package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gdg.unimatebackend.app.alarm.dto.FcmMessageDto;
 import com.gdg.unimatebackend.app.alarm.dto.FcmSendDto;
 import com.gdg.unimatebackend.app.alarm.service.FcmService;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -17,9 +16,11 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -29,9 +30,7 @@ public class FcmServiceImpl implements FcmService {
     private String projectId;
 
     /**
-     * 예시
-     *  - 운영(도커 마운트): /app/firebase-key.json   또는 file:/app/firebase-key.json
-     *  - 로컬(classpath):  classpath:firebase/unimate.json
+     * 예) file:/app/firebase-key.json
      */
     @Value("${fcm.key-path}")
     private String firebaseKeyPath;
@@ -44,8 +43,8 @@ public class FcmServiceImpl implements FcmService {
     }
 
     @Override
-    public String sendMessageTo(FcmSendDto fcmSendDto) throws IOException {
-        String jsonBody = makeMessage(fcmSendDto);
+    public String sendMessageTo(FcmSendDto dto) throws IOException {
+        String jsonBody = makeMessage(dto);
         return callFcmApi(jsonBody);
     }
 
@@ -75,13 +74,11 @@ public class FcmServiceImpl implements FcmService {
         headers.setBearerAuth(getAccessTokenInternal());
 
         HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
-
         String apiUrl = "https://fcm.googleapis.com/v1/projects/" + projectId + "/messages:send";
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(apiUrl, HttpMethod.POST, entity, String.class);
-            log.info("[FCM] status={}", response.getStatusCode());
-            log.info("[FCM] body={}", response.getBody());
+            log.info("[FCM] status={}, body={}", response.getStatusCode(), response.getBody());
             return "OK: " + response.getBody();
         } catch (HttpStatusCodeException e) {
             log.error("[FCM] status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
@@ -89,64 +86,49 @@ public class FcmServiceImpl implements FcmService {
         }
     }
 
-    /**
-     * ✅ OAuth2 Access Token 발급 (classpath/file 모두 지원)
-     */
     private String getAccessTokenInternal() throws IOException {
-        Resource resource = resolveKeyResource(firebaseKeyPath);
+        Resource resource = resourceLoader.getResource(firebaseKeyPath);
 
-        try (InputStream is = resource.getInputStream()) {
-            GoogleCredentials credentials = GoogleCredentials.fromStream(is)
-                    // ✅ FCM HTTP v1 최소 권한 스코프
-                    .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
+        GoogleCredentials credentials = GoogleCredentials
+                .fromStream(resource.getInputStream())
+                .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
 
-            credentials.refreshIfExpired();
-
-            if (credentials.getAccessToken() == null) {
-                credentials.refreshAccessToken();
-            }
-
-            return credentials.getAccessToken().getTokenValue();
+        credentials.refreshIfExpired();
+        if (credentials.getAccessToken() == null) {
+            credentials.refreshAccessToken();
         }
+
+        return credentials.getAccessToken().getTokenValue();
     }
 
     /**
-     * firebaseKeyPath가 classpath 접두어가 없고, "/"로 시작하면 file로 간주해준다.
+     * ✅ notification + data + android priority HIGH
      */
-    private Resource resolveKeyResource(String path) {
-        if (path == null || path.isBlank()) {
-            throw new IllegalStateException("fcm.key-path is blank");
-        }
+    private String makeMessage(FcmSendDto dto) throws JsonProcessingException {
+        Map<String, Object> root = new HashMap<>();
+        Map<String, Object> message = new HashMap<>();
 
-        String trimmed = path.trim();
+        message.put("token", dto.getToken());
 
-        // classpath:/ file:/ http: 같은 스킴이 이미 있으면 그대로 로딩
-        if (trimmed.contains(":")) {
-            return resourceLoader.getResource(trimmed);
-        }
+        // notification (배경에서 OS가 자동으로 띄움)
+        Map<String, String> notification = new HashMap<>();
+        notification.put("title", dto.getTitle());
+        notification.put("body", dto.getBody());
+        message.put("notification", notification);
 
-        // "/app/firebase-key.json" 같은 절대경로면 file로 처리
-        if (trimmed.startsWith("/")) {
-            return resourceLoader.getResource("file:" + trimmed);
-        }
+        // data (포그라운드/딥링크용 - 지금은 테스트 값)
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "TEST");
+        data.put("sentAt", Instant.now().toString());
+        message.put("data", data);
 
-        // 그 외는 classpath로 처리 (예: "firebase/unimate.json")
-        return resourceLoader.getResource("classpath:" + trimmed);
-    }
+        // android priority
+        Map<String, Object> android = new HashMap<>();
+        android.put("priority", "HIGH");
+        message.put("android", android);
 
-    private String makeMessage(FcmSendDto fcmSendDto) throws JsonProcessingException {
-        FcmMessageDto payload = FcmMessageDto.builder()
-                .validateOnly(false)
-                .message(FcmMessageDto.Message.builder()
-                        .token(fcmSendDto.getToken())
-                        .notification(FcmMessageDto.Notification.builder()
-                                .title(fcmSendDto.getTitle())
-                                .body(fcmSendDto.getBody())
-                                .image(null)
-                                .build())
-                        .build())
-                .build();
+        root.put("message", message);
 
-        return objectMapper.writeValueAsString(payload);
+        return objectMapper.writeValueAsString(root);
     }
 }
