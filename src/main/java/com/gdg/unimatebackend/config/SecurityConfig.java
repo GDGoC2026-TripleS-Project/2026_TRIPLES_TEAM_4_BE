@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -36,27 +37,33 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception ->
+                        exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ 프리플라이트(앱/브라우저에서 OPTIONS 먼저 날아오는 경우)
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        // ✅ 프리플라이트 허용 (앱/브라우저에서 OPTIONS 먼저 날아올 수 있음)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ 기존 허용 경로
+                        // ✅ 기존 허용
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/system/**").permitAll()
 
-                        // ✅ FCM 디버그
+                        // ✅ Swagger 허용
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/error").permitAll()
+
+                        // ✅ FCM 디버그 허용
                         .requestMatchers("/api/v1/fcm/debug/**").permitAll()
 
-                        // ✅ (추가) Android 토큰 등록 API - 테스트 단계에서만 먼저 오픈
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/fcm/tokens").permitAll()
+                        // ✅ (핵심) 실제 존재하는 경로로 오픈해야 401 해결됨
+                        // v3/api-docs 기준: POST /api/v1/fcm/token
+                        .requestMatchers(HttpMethod.POST, "/api/v1/fcm/token").permitAll()
 
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        // ✅ (테스트 루프용) 저장된 토큰으로 "나에게 발송"도 테스트 중엔 열어두는게 편함
+                        .requestMatchers(HttpMethod.POST, "/api/v1/fcm/test/me").permitAll()
+
+                        // 그 외는 JWT 필요
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
