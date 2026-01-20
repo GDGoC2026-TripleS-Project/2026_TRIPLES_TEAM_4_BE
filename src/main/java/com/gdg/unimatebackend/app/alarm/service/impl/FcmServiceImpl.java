@@ -30,7 +30,9 @@ public class FcmServiceImpl implements FcmService {
     private String projectId;
 
     /**
-     * 예) file:/app/firebase-key.json
+     * ✅ 반드시 아래 형태로 넣는 걸 권장
+     * - classpath:firebase/unimate.json
+     * - file:/app/firebase-key.json
      */
     @Value("${fcm.key-path}")
     private String firebaseKeyPath;
@@ -78,16 +80,25 @@ public class FcmServiceImpl implements FcmService {
 
         try {
             ResponseEntity<String> response = restTemplate.exchange(apiUrl, HttpMethod.POST, entity, String.class);
-            log.info("[FCM] status={}, body={}", response.getStatusCode(), response.getBody());
+            log.info("[FCM] send ok. status={}, body={}", response.getStatusCode(), response.getBody());
             return "OK: " + response.getBody();
         } catch (HttpStatusCodeException e) {
-            log.error("[FCM] status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("[FCM] send fail. status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
             return "ERROR: " + e.getStatusCode() + " " + e.getResponseBodyAsString();
         }
     }
 
     private String getAccessTokenInternal() throws IOException {
+        if (firebaseKeyPath == null || firebaseKeyPath.isBlank()) {
+            throw new IllegalStateException("fcm.key-path is blank");
+        }
+
         Resource resource = resourceLoader.getResource(firebaseKeyPath);
+
+        if (!resource.exists()) {
+            // ✅ 여기서 원인이 거의 100% 잡힘
+            throw new IllegalStateException("FCM key resource not found. fcm.key-path=" + firebaseKeyPath);
+        }
 
         GoogleCredentials credentials = GoogleCredentials
                 .fromStream(resource.getInputStream())
@@ -110,25 +121,21 @@ public class FcmServiceImpl implements FcmService {
 
         message.put("token", dto.getToken());
 
-        // notification (배경에서 OS가 자동으로 띄움)
         Map<String, String> notification = new HashMap<>();
         notification.put("title", dto.getTitle());
         notification.put("body", dto.getBody());
         message.put("notification", notification);
 
-        // data (포그라운드/딥링크용 - 지금은 테스트 값)
         Map<String, String> data = new HashMap<>();
         data.put("type", "TEST");
         data.put("sentAt", Instant.now().toString());
         message.put("data", data);
 
-        // android priority
         Map<String, Object> android = new HashMap<>();
         android.put("priority", "HIGH");
         message.put("android", android);
 
         root.put("message", message);
-
         return objectMapper.writeValueAsString(root);
     }
 }

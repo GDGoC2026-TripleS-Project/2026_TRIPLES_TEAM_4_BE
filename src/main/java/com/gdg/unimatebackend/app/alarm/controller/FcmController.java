@@ -28,10 +28,6 @@ public class FcmController {
     private final FcmDeviceTokenRepository tokenRepository;
     private final UserIdResolver userIdResolver;
 
-    /**
-     * ✅ 앱 → 서버: 토큰 등록
-     * - 지금은 테스트 편하게 X-USER-ID 헤더로 userId 받음
-     */
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> registerToken(
             @RequestHeader(value = "X-USER-ID", required = false) String headerUserId,
@@ -45,8 +41,9 @@ public class FcmController {
     /**
      * ✅ 서버 단독: 내 저장된 토큰으로 템플릿 발송
      * - body/title 없으면 기본값
+     * - consumes 제거해서 body 없이도 호출 가능하게
      */
-    @PostMapping(value = "/test/me", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
+    @PostMapping(value = "/test/me", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> testSendToMe(
             @RequestHeader(value = "X-USER-ID", required = false) String headerUserId,
             @RequestBody(required = false) FcmTestSendRequest request
@@ -73,8 +70,6 @@ public class FcmController {
 
         return ResponseEntity.ok(result);
     }
-
-    // ====== 기존 디버그 (유지) ======
 
     @GetMapping(value = "/debug/access-token", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> debugAccessToken() throws IOException {
