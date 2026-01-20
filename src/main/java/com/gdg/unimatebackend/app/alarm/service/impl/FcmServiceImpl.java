@@ -1,7 +1,3 @@
-// ✅ FcmServiceImpl.java (풀버전)
-// - "서버만으로 확인"을 위해: access token 발급 / 더미 전송 / 실제 전송 모두 제공
-// - RestTemplate + HTTP v1 방식 유지
-
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,7 +8,8 @@ import com.gdg.unimatebackend.app.alarm.service.FcmService;
 import com.google.auth.oauth2.GoogleCredentials;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.http.*;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.stereotype.Service;
@@ -20,6 +17,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -30,36 +28,32 @@ public class FcmServiceImpl implements FcmService {
     @Value("${fcm.project-id}")
     private String projectId;
 
+    /**
+     * 예시
+     *  - 운영(도커 마운트): /app/firebase-key.json   또는 file:/app/firebase-key.json
+     *  - 로컬(classpath):  classpath:firebase/unimate.json
+     */
     @Value("${fcm.key-path}")
     private String firebaseKeyPath;
 
+    private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * ✅ 실제 전송: 프론트가 준 device token이 있을 때 사용
-     * - 성공이면 "OK: <response-body>"
-     * - 실패면 "ERROR: <status> <body>"
-     */
+    public FcmServiceImpl(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
+
     @Override
     public String sendMessageTo(FcmSendDto fcmSendDto) throws IOException {
         String jsonBody = makeMessage(fcmSendDto);
         return callFcmApi(jsonBody);
     }
 
-    /**
-     * ✅ 서버만으로 access token 발급 확인
-     */
     @Override
     public String getAccessTokenForDebug() throws IOException {
         return getAccessTokenInternal();
     }
 
-    /**
-     * ✅ 서버만으로 FCM 호출 확인 (더미 토큰)
-     * - 목적: 401/403인지, 400인지로 "서버 연동 상태" 판별
-     *   - 400 INVALID_ARGUMENT -> 인증/권한 OK, 토큰만 없어서 실패 (정상적인 상태)
-     *   - 401/403 -> 인증/권한/프로젝트ID/키 파일 문제
-     */
     @Override
     public String sendDummyMessageForDebug() throws IOException {
         FcmSendDto dummy = FcmSendDto.builder()
@@ -72,12 +66,8 @@ public class FcmServiceImpl implements FcmService {
         return callFcmApi(jsonBody);
     }
 
-    /**
-     * ✅ FCM HTTP v1 호출 공통 로직
-     */
     private String callFcmApi(String jsonBody) throws IOException {
         RestTemplate restTemplate = new RestTemplate();
-        // 한글 깨짐 방지
         restTemplate.getMessageConverters().add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
 
         HttpHeaders headers = new HttpHeaders();
@@ -94,34 +84,56 @@ public class FcmServiceImpl implements FcmService {
             log.info("[FCM] body={}", response.getBody());
             return "OK: " + response.getBody();
         } catch (HttpStatusCodeException e) {
-            // FCM은 실패해도 body에 원인이 담기는 경우가 많음
             log.error("[FCM] status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
             return "ERROR: " + e.getStatusCode() + " " + e.getResponseBodyAsString();
         }
     }
 
     /**
-     * ✅ OAuth2 Access Token 발급 (서비스 계정 키 사용)
+     * ✅ OAuth2 Access Token 발급 (classpath/file 모두 지원)
      */
     private String getAccessTokenInternal() throws IOException {
-        GoogleCredentials googleCredentials = GoogleCredentials
-                .fromStream(new ClassPathResource(firebaseKeyPath).getInputStream())
-                .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
+        Resource resource = resolveKeyResource(firebaseKeyPath);
 
-        // 만료 시 갱신
-        googleCredentials.refreshIfExpired();
+        try (InputStream is = resource.getInputStream()) {
+            GoogleCredentials credentials = GoogleCredentials.fromStream(is)
+                    // ✅ FCM HTTP v1 최소 권한 스코프
+                    .createScoped(List.of("https://www.googleapis.com/auth/firebase.messaging"));
 
-        // refreshIfExpired 이후에도 null일 수 있어 강제 refresh 처리
-        if (googleCredentials.getAccessToken() == null) {
-            googleCredentials.refreshAccessToken();
+            credentials.refreshIfExpired();
+
+            if (credentials.getAccessToken() == null) {
+                credentials.refreshAccessToken();
+            }
+
+            return credentials.getAccessToken().getTokenValue();
         }
-
-        return googleCredentials.getAccessToken().getTokenValue();
     }
 
     /**
-     * ✅ DTO -> FCM HTTP v1 요청 바디(JSON) 생성
+     * firebaseKeyPath가 classpath 접두어가 없고, "/"로 시작하면 file로 간주해준다.
      */
+    private Resource resolveKeyResource(String path) {
+        if (path == null || path.isBlank()) {
+            throw new IllegalStateException("fcm.key-path is blank");
+        }
+
+        String trimmed = path.trim();
+
+        // classpath:/ file:/ http: 같은 스킴이 이미 있으면 그대로 로딩
+        if (trimmed.contains(":")) {
+            return resourceLoader.getResource(trimmed);
+        }
+
+        // "/app/firebase-key.json" 같은 절대경로면 file로 처리
+        if (trimmed.startsWith("/")) {
+            return resourceLoader.getResource("file:" + trimmed);
+        }
+
+        // 그 외는 classpath로 처리 (예: "firebase/unimate.json")
+        return resourceLoader.getResource("classpath:" + trimmed);
+    }
+
     private String makeMessage(FcmSendDto fcmSendDto) throws JsonProcessingException {
         FcmMessageDto payload = FcmMessageDto.builder()
                 .validateOnly(false)
