@@ -42,8 +42,17 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ 기존 허용 경로
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/system/**").permitAll()
+
+                        // ✅ FCM 디버그/테스트용 경로 허용 (여기 추가)
+                        // - 지금 Postman에서 401 뜨는 문제 해결
+                        // - 서버만으로 access-token 발급/더미 전송 확인 가능
+                        .requestMatchers("/api/v1/fcm/debug/**").permitAll()
+                        // 선택: 실제 전송도 인증 없이 임시로 열고 싶으면 아래 주석 해제
+                        // .requestMatchers("/api/v1/fcm/send").permitAll()
+
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
@@ -80,7 +89,6 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", c);
         return source;
     }
-
 
     @Bean
     public PasswordEncoder passwordEncoder() {
