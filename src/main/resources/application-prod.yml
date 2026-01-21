@@ -42,7 +42,7 @@ management:
     health:
       probes:
         enabled: true
-      show-details: always
+      show-details: never
 
   # ✅ 핵심: 운영에서 메일 헬스체크로 readiness DOWN 되는 거 방지
   health:
