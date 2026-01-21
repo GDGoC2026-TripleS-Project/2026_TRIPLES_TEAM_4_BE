@@ -28,6 +28,10 @@ public class FcmTestController {
                             .build()
             );
         }
+        System.out.println("principalClass=" + authentication.getPrincipal().getClass().getName()
+                + ", name=" + authentication.getName()
+                + ", principal=" + authentication.getPrincipal());
+
 
         // ✅ 너 프로젝트 principal 구조에 맞게 “userId 추출”만 맞추면 됨
         Long userId = fcmTestService.extractUserId(authentication);

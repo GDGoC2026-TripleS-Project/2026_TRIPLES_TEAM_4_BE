@@ -21,28 +21,42 @@ public class FcmTestServiceImpl implements FcmTestService {
 
     @Override
     public Long extractUserId(Authentication authentication) {
-        // ✅ 너 프로젝트에서 principal이 어떤 타입인지에 따라 여기만 바꾸면 됨.
-        // 예: principal이 CustomUserDetails 이면 getId()
-        Object p = authentication.getPrincipal();
-
-        // 1) principal이 String("1") 처럼 들어오는 경우
-        if (p instanceof String s) {
-            return Long.parseLong(s);
-        }
-
-        // 2) principal이 org.springframework.security.core.userdetails.User 같은 경우는 id 없음
-        //    → 보통 커스텀 principal을 쓰는 게 맞음
-        //    아래는 “리플렉션으로 getId() 있으면 가져오기” (임시로 매우 강력)
+        // 0) 제일 우선: name()에 userId가 들어있는 경우 (권장)
         try {
-            var m = p.getClass().getMethod("getId");
-            Object id = m.invoke(p);
-            if (id instanceof Long l) return l;
-            if (id instanceof Integer i) return i.longValue();
-            if (id instanceof String s2) return Long.parseLong(s2);
+            String name = authentication.getName();
+            if (name != null && name.matches("\\d+")) {
+                return Long.parseLong(name);
+            }
         } catch (Exception ignored) {}
 
-        // 3) 못 뽑으면 명확하게 실패 응답을 내리게 컨트롤러에서 처리할 수도 있음.
-        //    여기서는 그냥 예외를 던지지 않고 “-1”로 보내고 아래에서 응답 처리.
+        Object p = authentication.getPrincipal();
+        if (p == null) return -1L;
+
+        // 1) principal이 "1" 같은 문자열인 경우
+        if (p instanceof String s) {
+            if (s.matches("\\d+")) return Long.parseLong(s);
+            return -1L;
+        }
+
+        // 2) principal이 Map / claims 처럼 sub를 들고 있는 경우
+        if (p instanceof java.util.Map<?, ?> map) {
+            Object sub = map.get("sub");
+            if (sub != null && sub.toString().matches("\\d+")) {
+                return Long.parseLong(sub.toString());
+            }
+        }
+
+        // 3) getUserId(), getId() 메서드가 있는 커스텀 principal 대응
+        for (String methodName : new String[]{"getUserId", "getId"}) {
+            try {
+                var m = p.getClass().getMethod(methodName);
+                Object id = m.invoke(p);
+                if (id == null) continue;
+                String s = id.toString();
+                if (s.matches("\\d+")) return Long.parseLong(s);
+            } catch (Exception ignored) {}
+        }
+
         return -1L;
     }
 
