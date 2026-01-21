@@ -1,7 +1,6 @@
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.gdg.unimatebackend.app.alarm.dto.FcmTokenRegisterRequest;
-import com.gdg.unimatebackend.app.alarm.entity.FcmDeviceToken;
 import com.gdg.unimatebackend.app.alarm.repository.FcmDeviceTokenRepository;
 import com.gdg.unimatebackend.app.alarm.service.FcmTokenService;
 import lombok.RequiredArgsConstructor;
@@ -19,39 +18,50 @@ public class FcmTokenServiceImpl implements FcmTokenService {
     @Override
     @Transactional
     public void register(Long userId, FcmTokenRegisterRequest request) {
-        String token = request.getToken().trim();
+        String token = normalizeToken(request.getToken());
 
-        // 1) JWT가 들어오는 사고를 백엔드에서 차단
+        // 1) JWT 같은 쓰레기 값 차단
         validateNotJwtLike(token);
 
-        // 2) (선택) 어떤 유저가 이미 이 토큰을 쓰고 있으면 "현재 유저"로 재할당
-        tokenRepository.findByToken(token).ifPresent(existingByToken -> {
-            if (existingByToken.getUserId() != null && !existingByToken.getUserId().equals(userId)) {
-                // 정책상 user당 1개니까: 이전 유저 토큰을 비활성화(or 삭제)하고 재할당하는 편이 안전
-                // 여기서는 "재할당" 선택
-            }
-        });
+        String deviceId = trimToNull(request.getDeviceId());
+        String platform = trimToNull(request.getPlatform());
 
-        // 3) 유저 기준으로 1개만 유지: 있으면 update, 없으면 create
-        FcmDeviceToken entity = tokenRepository.findByUserId(userId)
-                .orElseGet(() -> FcmDeviceToken.builder()
-                        .userId(userId)
-                        .isActive(true)
-                        .build());
+        // 2) (정책 선택) "유저당 활성 1개"를 강하게 유지하고 싶으면
+        //    기존 userId 토큰을 일단 비활성화하고 -> 이번 토큰을 활성 업서트
+        //    프론트가 중복호출해도 결과는 항상 동일(마지막 토큰 1개 active)
+        tokenRepository.deactivateAllByUserId(userId);
 
-        entity.activateForUser(userId, request.getDeviceId(), request.getPlatform());
-        entity.updateToken(token); // 아래 엔티티에 메서드 추가 추천
-        tokenRepository.save(entity);
+        // 3) 핵심: token unique 기반 업서트 (동시성 안전)
+        tokenRepository.upsertByToken(userId, token, deviceId, platform);
 
-        log.info("[FCM] token registered(1-per-user). userId={}, deviceId={}, platform={}",
-                userId, request.getDeviceId(), request.getPlatform());
+        log.info("[FCM] token upserted. userId={}, deviceId={}, platform={}, tokenPrefix={}",
+                userId, deviceId, platform, safePrefix(token));
+    }
+
+    private String normalizeToken(String token) {
+        if (token == null) throw new IllegalArgumentException("token is required");
+        String t = token.trim();
+        if (t.isEmpty()) throw new IllegalArgumentException("token is required");
+        return t;
+    }
+
+    private String trimToNull(String v) {
+        if (v == null) return null;
+        String t = v.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private void validateNotJwtLike(String token) {
-        // JWT는 보통 "header.payload.signature" 형태(점 2개) + "eyJ"로 시작하는 경우가 많음
-        boolean looksLikeJwt = token.startsWith("eyJ") && token.chars().filter(ch -> ch == '.').count() == 2;
+        // JWT는 보통 "xxx.yyy.zzz" + "eyJ" 시작
+        long dotCount = token.chars().filter(ch -> ch == '.').count();
+        boolean looksLikeJwt = token.startsWith("eyJ") && dotCount == 2;
         if (looksLikeJwt) {
             throw new IllegalArgumentException("FCM token is invalid (looks like JWT).");
         }
+    }
+
+    private String safePrefix(String token) {
+        int n = Math.min(token.length(), 12);
+        return token.substring(0, n) + "...";
     }
 }
