@@ -61,7 +61,7 @@ public class FcmDeviceToken {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void activateForUser(Long userId) {
+    public void activateForUser(Long userId, String deviceId, String platform) {
         this.userId = userId;
         this.deviceId = deviceId;
         this.platform = platform;
