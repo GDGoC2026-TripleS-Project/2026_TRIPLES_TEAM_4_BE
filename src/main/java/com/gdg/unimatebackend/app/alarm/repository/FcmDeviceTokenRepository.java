@@ -12,4 +12,6 @@ public interface FcmDeviceTokenRepository extends JpaRepository<FcmDeviceToken, 
     Optional<FcmDeviceToken> findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(Long userId);
 
     void deleteByUserId(Long userId);
+
+    Optional<FcmDeviceToken> findByUserId(Long userId);
 }
