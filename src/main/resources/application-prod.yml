@@ -1,6 +1,7 @@
 spring:
   datasource:
-    # 운영은 무조건 ENV로 덮어쓰기 권장
+    # 운영은 DB_HOST/PORT/NAME로도 되고, SPRING_DATASOURCE_URL로도 됨.
+    # 지금 너는 .env에 SPRING_DATASOURCE_URL을 넣었으니 그걸 우선으로 쓰게 두는 게 깔끔.
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
@@ -10,25 +11,40 @@ spring:
       ddl-auto: ${DDL_AUTO:update}
 
 springdoc:
-  api-docs:
-    enabled: false
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}
 
 app:
   swagger:
-    prod-url: ${SWAGGER_PROD_URL:https://seok-hwan1.duckdns.org}
-  frontend:
-    url: ${FRONTEND_URL:https://seok-hwan1.duckdns.org}
+    prod-url: https://seok-hwan1.duckdns.org
 
 oauth:
   kakao:
-    redirect-uri: ${KAKAO_REDIRECT_URI:https://seok-hwan1.duckdns.org/api/auth/kakao/callback}
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/kakao/callback
 
   naver:
-    redirect-uri: ${NAVER_REDIRECT_URI:https://seok-hwan1.duckdns.org/api/auth/naver/callback}
+    client-id: ${NAVER_CLIENT_ID}
+    client-secret: ${NAVER_CLIENT_SECRET}
+    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/naver/callback
 
 fcm:
   project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
-  # 운영은 마운트된 절대경로를 ENV로 주입하는 방식이 가장 안정적
   key-path: ${FCM_KEY_PATH:/app/firebase-key.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+  # ✅ 핵심: 운영에서 메일 헬스체크로 readiness DOWN 되는 거 방지
+  health:
+    mail:
+      enabled: false

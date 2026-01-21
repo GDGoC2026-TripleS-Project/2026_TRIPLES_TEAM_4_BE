@@ -7,10 +7,9 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 기본은 로컬 개발값, 운영은 application-prod.yml 또는 ENV로 override
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:unimate_db}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:root}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:1234}}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:unimate_db}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:1234}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX:5}
       minimum-idle: ${DB_POOL_MIN_IDLE:2}
@@ -57,7 +56,6 @@ spring:
 springdoc:
   api-docs:
     path: /v3/api-docs
-    enabled: true
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html
@@ -103,15 +101,4 @@ oauth:
 
 fcm:
   project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
-  # 로컬에서는 classpath 사용 가능
   key-path: ${FCM_KEY_PATH:classpath:firebase/unimate.json}
-
-management:
-  endpoints:
-    web:
-      base-path: /actuator
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      show-details: never
