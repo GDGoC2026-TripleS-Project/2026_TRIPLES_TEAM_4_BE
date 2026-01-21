@@ -40,46 +40,22 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-                )
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // ====== public (health / docs) ======
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-                        // ===== System / Swagger =====
-                        .requestMatchers("/api/system/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/error").permitAll()
+                        // ====== public (FCM dev/test) ======
+                        .requestMatchers("/api/v1/fcm/test/**").permitAll()
 
-                        // ===== Auth: 공개 =====
-                        .requestMatchers(HttpMethod.POST,
-                                "/api/auth/signup",
-                                "/api/auth/login",
-                                "/api/auth/password/reset",
-                                "/api/auth/email/find",
-                                "/api/auth/email/verification/send",
-                                "/api/auth/email/verification/confirm",
-                                "/api/auth/social/login"       // (선택) accessToken 직접 전달 방식도 유지
-                        ).permitAll()
+                        // 필요하면 이것도 개발용으로 임시 오픈 가능 (추천은 X)
+                        // .requestMatchers("/api/v1/fcm/token/**").permitAll()
 
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/auth/naver/authorize-url",
-                                "/api/auth/kakao/authorize-url",
-                                "/api/auth/naver/callback",
-                                "/api/auth/kakao/callback",
-                                "/api/auth/nickname/check"
-                        ).permitAll()
+                        // ====== auth endpoints ======
+                        .requestMatchers("/api/auth/**").permitAll()
 
-                        // ===== Auth: 인증 필요 =====
-                        .requestMatchers(HttpMethod.DELETE, "/api/auth/account").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/password/change").authenticated()
-
-                        // ===== FCM: 인증 필요 =====
-                        .requestMatchers("/api/v1/fcm/**").authenticated()
-
+                        // ====== everything else ======
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
