@@ -52,44 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String method = request.getMethod();
+        String path = request.getRequestURI();
 
-        // System / Swagger
-        if (matcher.match("/api/system/**", uri)
-                || matcher.match("/swagger-ui/**", uri)
-                || matcher.match("/v3/api-docs/**", uri)
-                || matcher.match("/swagger-ui.html", uri)
-                || matcher.match("/error", uri)) {
-            return true;
-        }
-
-        // Auth 중 "공개"만 JWT 필터 제외
-        if (matcher.match("/api/auth/**", uri)) {
-            // GET 공개
-            if (HttpMethod.GET.matches(method)) {
-                return matcher.match("/api/auth/naver/authorize-url", uri)
-                        || matcher.match("/api/auth/kakao/authorize-url", uri)
-                        || matcher.match("/api/auth/naver/callback", uri)
-                        || matcher.match("/api/auth/kakao/callback", uri)
-                        || matcher.match("/api/auth/nickname/check", uri);
-            }
-
-            // POST 공개
-            if (HttpMethod.POST.matches(method)) {
-                return matcher.match("/api/auth/signup", uri)
-                        || matcher.match("/api/auth/login", uri)
-                        || matcher.match("/api/auth/password/reset", uri)
-                        || matcher.match("/api/auth/email/find", uri)
-                        || matcher.match("/api/auth/email/verification/send", uri)
-                        || matcher.match("/api/auth/email/verification/confirm", uri)
-                        || matcher.match("/api/auth/social/login", uri);
-            }
-
-            // 나머지 auth(DELETE /account, POST /password/change, POST /logout)는 필터 적용
-            return false;
-        }
-
-        return false;
+        return path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.equals("/actuator/health")
+                || path.startsWith("/api/auth/")
+                || path.startsWith("/api/v1/fcm/test/");
     }
 }
