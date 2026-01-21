@@ -1,38 +1,34 @@
 spring:
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # 운영은 무조건 ENV로 덮어쓰기 권장
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${DDL_AUTO:update}
 
 springdoc:
+  api-docs:
+    enabled: false
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}
 
 app:
   swagger:
-    prod-url: https://seok-hwan1.duckdns.org
+    prod-url: ${SWAGGER_PROD_URL:https://seok-hwan1.duckdns.org}
+  frontend:
+    url: ${FRONTEND_URL:https://seok-hwan1.duckdns.org}
 
 oauth:
   kakao:
-    client-id: ${KAKAO_CLIENT_ID}
-    client-secret: ${KAKAO_CLIENT_SECRET:}
-    authorize-uri: https://kauth.kakao.com/oauth/authorize
-    token-uri: https://kauth.kakao.com/oauth/token
-    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/kakao/callback
+    redirect-uri: ${KAKAO_REDIRECT_URI:https://seok-hwan1.duckdns.org/api/auth/kakao/callback}
 
   naver:
-    client-id: ${NAVER_CLIENT_ID}
-    client-secret: ${NAVER_CLIENT_SECRET}
-    authorize-uri: https://nid.naver.com/oauth2.0/authorize
-    token-uri: https://nid.naver.com/oauth2.0/token
-    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/naver/callback
+    redirect-uri: ${NAVER_REDIRECT_URI:https://seok-hwan1.duckdns.org/api/auth/naver/callback}
 
 fcm:
-  project-id: unimate-1d1d1
-  key-path: /app/firebase-key.json
-
-
+  project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
+  # 운영은 마운트된 절대경로를 ENV로 주입하는 방식이 가장 안정적
+  key-path: ${FCM_KEY_PATH:/app/firebase-key.json}
