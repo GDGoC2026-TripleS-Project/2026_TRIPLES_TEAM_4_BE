@@ -1,3 +1,6 @@
+// ===============================
+// FcmTestServiceImpl.java (FULL)
+// ===============================
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.gdg.unimatebackend.app.alarm.dto.FcmSendDto;
@@ -11,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,12 +26,13 @@ public class FcmTestServiceImpl implements FcmTestService {
 
     @Override
     public Long extractUserId(Authentication authentication) {
-        // 0) 제일 우선: name()에 userId가 들어있는 경우 (권장)
+        if (authentication == null) return -1L;
+
+        // 0) 가장 신뢰: authentication.getName() (우리 프로젝트는 userId를 name에 넣는 형태가 깔끔)
         try {
             String name = authentication.getName();
-            if (name != null && name.matches("\\d+")) {
-                return Long.parseLong(name);
-            }
+            Long parsed = parsePositiveLong(name);
+            if (parsed != null) return parsed;
         } catch (Exception ignored) {}
 
         Object p = authentication.getPrincipal();
@@ -34,26 +40,33 @@ public class FcmTestServiceImpl implements FcmTestService {
 
         // 1) principal이 "1" 같은 문자열인 경우
         if (p instanceof String s) {
-            if (s.matches("\\d+")) return Long.parseLong(s);
-            return -1L;
+            Long parsed = parsePositiveLong(s);
+            return parsed != null ? parsed : -1L;
         }
 
         // 2) principal이 Map / claims 처럼 sub를 들고 있는 경우
-        if (p instanceof java.util.Map<?, ?> map) {
+        if (p instanceof Map<?, ?> map) {
             Object sub = map.get("sub");
-            if (sub != null && sub.toString().matches("\\d+")) {
-                return Long.parseLong(sub.toString());
-            }
+            Long parsed = parsePositiveLong(sub == null ? null : sub.toString());
+            if (parsed != null) return parsed;
+
+            // 혹시 키가 다른 경우까지 방어적으로
+            Object id = map.get("id");
+            parsed = parsePositiveLong(id == null ? null : id.toString());
+            if (parsed != null) return parsed;
+
+            Object userId = map.get("userId");
+            parsed = parsePositiveLong(userId == null ? null : userId.toString());
+            if (parsed != null) return parsed;
         }
 
-        // 3) getUserId(), getId() 메서드가 있는 커스텀 principal 대응
-        for (String methodName : new String[]{"getUserId", "getId"}) {
+        // 3) 커스텀 principal에 getUserId()/getId()/getMemberId()가 있는 경우 리플렉션으로 대응
+        for (String methodName : new String[]{"getUserId", "getId", "getMemberId"}) {
             try {
                 var m = p.getClass().getMethod(methodName);
                 Object id = m.invoke(p);
-                if (id == null) continue;
-                String s = id.toString();
-                if (s.matches("\\d+")) return Long.parseLong(s);
+                Long parsed = parsePositiveLong(id == null ? null : id.toString());
+                if (parsed != null) return parsed;
             } catch (Exception ignored) {}
         }
 
@@ -66,11 +79,11 @@ public class FcmTestServiceImpl implements FcmTestService {
             return FcmTestResponse.builder()
                     .success(false)
                     .message("Invalid userId from JWT principal")
-                    .detail("principal에서 userId 추출 실패. extractUserId 로직을 프로젝트 principal에 맞게 수정 필요")
+                    .detail("principal에서 userId 추출 실패. (authentication.getName / principal 구조 확인 필요)")
                     .build();
         }
 
-        // ✅ 1) DB에서 활성 토큰 조회 (없으면 500 대신 친절한 응답)
+        // 1) DB에서 활성 토큰 조회
         FcmDeviceToken tokenEntity = tokenRepository
                 .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(userId)
                 .orElse(null);
@@ -85,7 +98,7 @@ public class FcmTestServiceImpl implements FcmTestService {
 
         String token = tokenEntity.getToken().trim();
 
-        // ✅ 2) FCM 전송(여기서도 IOException이 나면 500 대신 응답으로 반환)
+        // 2) 전송
         try {
             String result = fcmService.sendMessageTo(
                     FcmSendDto.builder()
@@ -95,9 +108,12 @@ public class FcmTestServiceImpl implements FcmTestService {
                             .build()
             );
 
+            // fcmService가 "ERROR: ..." 문자열을 리턴할 수 있으니, 성공 여부를 문자열로도 한 번 더 반영
+            boolean ok = result != null && result.startsWith("OK:");
+
             return FcmTestResponse.builder()
-                    .success(true)
-                    .message("FCM send attempted")
+                    .success(ok)
+                    .message(ok ? "FCM send ok" : "FCM send failed (FCM response)")
                     .detail(result)
                     .build();
 
@@ -106,8 +122,24 @@ public class FcmTestServiceImpl implements FcmTestService {
             return FcmTestResponse.builder()
                     .success(false)
                     .message("FCM send failed (server-side)")
-                    .detail(e.getClass().getSimpleName() + ": " + e.getMessage())
+                    .detail(e.getClass().getSimpleName() + ": " + safeMsg(e.getMessage()))
                     .build();
         }
+    }
+
+    private Long parsePositiveLong(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (!t.matches("\\d+")) return null;
+        try {
+            long v = Long.parseLong(t);
+            return v > 0 ? v : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String safeMsg(String msg) {
+        return msg == null ? "" : msg;
     }
 }

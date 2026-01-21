@@ -1,9 +1,15 @@
+// ===============================
+// FcmServiceImpl.java (FULL)
+// - 핵심 수정: key-path가 "/app/..."이면 자동으로 "file:" 붙여서 ResourceLoader가 확실히 파일로 읽게 함
+// - AccessToken은 캐싱해서 매 요청마다 파일/토큰 갱신 비용 줄임
+// ===============================
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gdg.unimatebackend.app.alarm.dto.FcmSendDto;
 import com.gdg.unimatebackend.app.alarm.service.FcmService;
+import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,15 +36,22 @@ public class FcmServiceImpl implements FcmService {
     private String projectId;
 
     /**
-     * ✅ 반드시 아래 형태로 넣는 걸 권장
+     * 권장:
      * - classpath:firebase/unimate.json
      * - file:/app/firebase-key.json
+     *
+     * 실수 방지:
+     * - "/app/firebase-key.json" 으로 들어오면 자동으로 "file:" 붙여서 읽는다
      */
     @Value("${fcm.key-path}")
     private String firebaseKeyPath;
 
     private final ResourceLoader resourceLoader;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // ✅ 토큰 캐시 (간단/안전 버전)
+    private volatile String cachedAccessToken;
+    private volatile Instant cachedAccessTokenExpireAt;
 
     public FcmServiceImpl(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
@@ -89,31 +102,69 @@ public class FcmServiceImpl implements FcmService {
     }
 
     private String getAccessTokenInternal() throws IOException {
-        if (firebaseKeyPath == null || firebaseKeyPath.isBlank()) {
-            throw new IllegalStateException("fcm.key-path is blank");
+        // 0) 캐시가 아직 유효하면 재사용
+        if (cachedAccessToken != null && cachedAccessTokenExpireAt != null) {
+            // 만료 60초 전부터는 갱신
+            if (cachedAccessTokenExpireAt.isAfter(Instant.now().plusSeconds(60))) {
+                return cachedAccessToken;
+            }
         }
 
-        Resource resource = resourceLoader.getResource(firebaseKeyPath);
+        String keyPath = normalizeKeyPath(firebaseKeyPath);
 
+        if (keyPath == null || keyPath.isBlank()) {
+            throw new IllegalStateException("fcm.key-path is blank");
+        }
+        if (projectId == null || projectId.isBlank()) {
+            throw new IllegalStateException("fcm.project-id is blank");
+        }
+
+        Resource resource = resourceLoader.getResource(keyPath);
         if (!resource.exists()) {
-            // ✅ 여기서 원인이 거의 100% 잡힘
-            throw new IllegalStateException("FCM key resource not found. fcm.key-path=" + firebaseKeyPath);
+            throw new IllegalStateException("FCM key resource not found. fcm.key-path=" + keyPath);
         }
 
         GoogleCredentials credentials = GoogleCredentials
                 .fromStream(resource.getInputStream())
                 .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
 
+        // refreshIfExpired()만으로 토큰이 null일 수 있어서 방어
         credentials.refreshIfExpired();
         if (credentials.getAccessToken() == null) {
             credentials.refreshAccessToken();
         }
 
-        return credentials.getAccessToken().getTokenValue();
+        AccessToken accessToken = credentials.getAccessToken();
+        if (accessToken == null || accessToken.getTokenValue() == null) {
+            throw new IllegalStateException("Failed to obtain FCM access token (null)");
+        }
+
+        cachedAccessToken = accessToken.getTokenValue();
+        // 만료 정보가 없을 수도 있어서 방어적으로 처리
+        cachedAccessTokenExpireAt = accessToken.getExpirationTime() != null
+                ? accessToken.getExpirationTime().toInstant()
+                : Instant.now().plusSeconds(300);
+
+        return cachedAccessToken;
+    }
+
+    private String normalizeKeyPath(String path) {
+        if (path == null) return null;
+        String p = path.trim();
+        if (p.isEmpty()) return p;
+
+        // 이미 스킴이 있으면 그대로
+        if (p.startsWith("classpath:") || p.startsWith("file:")) return p;
+
+        // "/app/..." 같이 절대경로면 file: 스킴을 강제
+        if (p.startsWith("/")) return "file:" + p;
+
+        // 그 외는 그대로(상대경로를 쓰는 특별 케이스)
+        return p;
     }
 
     /**
-     * ✅ notification + data + android priority HIGH
+     * notification + data + android priority HIGH
      */
     private String makeMessage(FcmSendDto dto) throws JsonProcessingException {
         Map<String, Object> root = new HashMap<>();
