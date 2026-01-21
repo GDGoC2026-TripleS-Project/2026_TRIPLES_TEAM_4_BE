@@ -33,43 +33,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // ✅ CORS 적용 (빈만 만들고 적용 안 하면 의미 없음)
-                .cors(cors -> {}) // withDefaults() 대체 형태
-
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // ✅ 기본 로그인 기능 제거 (JWT 서버에서 필요 없음)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
-                .logout(AbstractHttpConfigurer::disable)
-
-                // ✅ 401/403 응답 일관성 (디버깅 쉬워짐)
-                .exceptionHandling(eh -> eh
-                        .authenticationEntryPoint((req, res, ex) -> res.sendError(401))
-                        .accessDeniedHandler((req, res, ex) -> res.sendError(403))
-                )
-
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ Preflight는 무조건 열어야 CORS가 안정적
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // ✅ actuator health 하위까지 열기 (readiness/liveness 포함)
-                        .requestMatchers("/actuator/health/**").permitAll()
-
-                        // ✅ swagger
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-
-                        // ✅ auth
+                        // public
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
 
-                        // ✅ FCM dev/test
-                        .requestMatchers("/api/v1/fcm/test/**").permitAll()
+                        // protected (FCM)
+                        .requestMatchers("/api/v1/fcm/token/**").authenticated()
+                        .requestMatchers("/api/v1/fcm/test/**").authenticated()
 
-                        // 나머지
                         .anyRequest().authenticated()
                 )
-
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
