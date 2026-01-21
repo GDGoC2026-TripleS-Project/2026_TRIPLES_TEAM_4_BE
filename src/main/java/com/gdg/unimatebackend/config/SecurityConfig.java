@@ -1,6 +1,10 @@
 package com.gdg.unimatebackend.config;
 
 import com.gdg.unimatebackend.global.security.jwt.JwtAuthenticationFilter;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -42,28 +46,40 @@ public class SecurityConfig {
                         exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
-                        // ✅ 프리플라이트 허용 (앱/브라우저에서 OPTIONS 먼저 날아올 수 있음)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ 기존 허용
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // ===== System / Swagger =====
                         .requestMatchers("/api/system/**").permitAll()
-
-                        // ✅ Swagger 허용
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/error").permitAll()
 
-                        // ✅ FCM 디버그 허용
-                        .requestMatchers("/api/v1/fcm/debug/**").permitAll()
+                        // ===== Auth: 공개 =====
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/password/reset",
+                                "/api/auth/email/find",
+                                "/api/auth/email/verification/send",
+                                "/api/auth/email/verification/confirm",
+                                "/api/auth/social/login"       // (선택) accessToken 직접 전달 방식도 유지
+                        ).permitAll()
 
-                        // ✅ (핵심) 실제 존재하는 경로로 오픈해야 401 해결됨
-                        // v3/api-docs 기준: POST /api/v1/fcm/token
-                        .requestMatchers(HttpMethod.POST, "/api/v1/fcm/token").permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/auth/naver/authorize-url",
+                                "/api/auth/kakao/authorize-url",
+                                "/api/auth/naver/callback",
+                                "/api/auth/kakao/callback",
+                                "/api/auth/nickname/check"
+                        ).permitAll()
 
-                        // ✅ (테스트 루프용) 저장된 토큰으로 "나에게 발송"도 테스트 중엔 열어두는게 편함
-                        .requestMatchers(HttpMethod.POST, "/api/v1/fcm/test/me").permitAll()
+                        // ===== Auth: 인증 필요 =====
+                        .requestMatchers(HttpMethod.DELETE, "/api/auth/account").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password/change").authenticated()
 
-                        // 그 외는 JWT 필요
+                        // ===== FCM: 인증 필요 =====
+                        .requestMatchers("/api/v1/fcm/**").authenticated()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -83,7 +99,6 @@ public class SecurityConfig {
         c.addAllowedOriginPattern("https://seok-hwan1.duckdns.org");
         c.addAllowedOriginPattern("http://seok-hwan1.duckdns.org");
 
-        // 선택: 프론트 URL이 환경변수로 들어오는 경우
         if (frontendUrl != null && !frontendUrl.isBlank()) {
             c.addAllowedOriginPattern(frontendUrl);
         }

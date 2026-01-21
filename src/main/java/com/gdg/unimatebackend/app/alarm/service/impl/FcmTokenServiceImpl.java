@@ -28,14 +28,12 @@ public class FcmTokenServiceImpl implements FcmTokenService {
                         .build());
 
         entity.activateForUser(
-                userId,
-                request.getDeviceId(),
-                request.getPlatform() == null ? "ANDROID" : request.getPlatform()
+                userId
         );
 
         tokenRepository.save(entity);
 
         log.info("[FCM] token registered. userId={}, deviceId={}, platform={}",
-                userId, request.getDeviceId(), entity.getPlatform());
+                userId);
     }
 }
