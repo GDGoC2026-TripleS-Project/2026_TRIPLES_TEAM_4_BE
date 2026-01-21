@@ -1,3 +1,9 @@
+// ===============================
+// FcmTokenServiceImpl.java (FULL)
+// - deviceId/platform 필수 아님 (null 허용)
+// - "유저당 활성 1개" 정책: 기존 userId 토큰 비활성화 후 업서트
+// - 토큰이 JWT처럼 생기면 차단
+// ===============================
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.gdg.unimatebackend.app.alarm.dto.FcmTokenRegisterRequest;
@@ -18,6 +24,13 @@ public class FcmTokenServiceImpl implements FcmTokenService {
     @Override
     @Transactional
     public void register(Long userId, FcmTokenRegisterRequest request) {
+        if (userId == null || userId <= 0) {
+            throw new IllegalArgumentException("userId is invalid");
+        }
+        if (request == null) {
+            throw new IllegalArgumentException("request is required");
+        }
+
         String token = normalizeToken(request.getToken());
 
         // 1) JWT 같은 쓰레기 값 차단
@@ -26,12 +39,10 @@ public class FcmTokenServiceImpl implements FcmTokenService {
         String deviceId = trimToNull(request.getDeviceId());
         String platform = trimToNull(request.getPlatform());
 
-        // 2) (정책 선택) "유저당 활성 1개"를 강하게 유지하고 싶으면
-        //    기존 userId 토큰을 일단 비활성화하고 -> 이번 토큰을 활성 업서트
-        //    프론트가 중복호출해도 결과는 항상 동일(마지막 토큰 1개 active)
+        // 2) "유저당 활성 1개" 정책 (가장 안정적)
         tokenRepository.deactivateAllByUserId(userId);
 
-        // 3) 핵심: token unique 기반 업서트 (동시성 안전)
+        // 3) token unique 기반 업서트
         tokenRepository.upsertByToken(userId, token, deviceId, platform);
 
         log.info("[FCM] token upserted. userId={}, deviceId={}, platform={}, tokenPrefix={}",
