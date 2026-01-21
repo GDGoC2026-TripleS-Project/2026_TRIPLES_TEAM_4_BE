@@ -71,4 +71,7 @@ public class FcmDeviceToken {
     public void deactivate() {
         this.isActive = false;
     }
+    public void updateToken(String token) {
+        this.token = token;
+    }
 }
