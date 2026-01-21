@@ -1,9 +1,7 @@
-// ===============================
-// FcmTestServiceImpl.java (FULL)
-// ===============================
 package com.gdg.unimatebackend.app.alarm.service.impl;
 
 import com.gdg.unimatebackend.app.alarm.dto.FcmSendDto;
+import com.gdg.unimatebackend.app.alarm.dto.FcmSendRequest;
 import com.gdg.unimatebackend.app.alarm.dto.FcmTestResponse;
 import com.gdg.unimatebackend.app.alarm.entity.FcmDeviceToken;
 import com.gdg.unimatebackend.app.alarm.repository.FcmDeviceTokenRepository;
@@ -21,6 +19,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FcmTestServiceImpl implements FcmTestService {
 
+    private static final String DEFAULT_TITLE = "Unimate Test";
+    private static final String DEFAULT_BODY  = "서버 템플릿 발송 테스트";
+
     private final FcmDeviceTokenRepository tokenRepository;
     private final FcmService fcmService;
 
@@ -28,44 +29,38 @@ public class FcmTestServiceImpl implements FcmTestService {
     public Long extractUserId(Authentication authentication) {
         if (authentication == null) return -1L;
 
-        // 0) 가장 신뢰: authentication.getName() (우리 프로젝트는 userId를 name에 넣는 형태가 깔끔)
+        // 0) 가장 신뢰: authentication.getName()
         try {
-            String name = authentication.getName();
-            Long parsed = parsePositiveLong(name);
+            Long parsed = parsePositiveLong(authentication.getName());
             if (parsed != null) return parsed;
         } catch (Exception ignored) {}
 
         Object p = authentication.getPrincipal();
         if (p == null) return -1L;
 
-        // 1) principal이 "1" 같은 문자열인 경우
+        // 1) principal이 문자열인 경우
         if (p instanceof String s) {
             Long parsed = parsePositiveLong(s);
             return parsed != null ? parsed : -1L;
         }
 
-        // 2) principal이 Map / claims 처럼 sub를 들고 있는 경우
+        // 2) principal이 Map(claims)인 경우
         if (p instanceof Map<?, ?> map) {
-            Object sub = map.get("sub");
-            Long parsed = parsePositiveLong(sub == null ? null : sub.toString());
+            Long parsed = parsePositiveLong(toStr(map.get("sub")));
             if (parsed != null) return parsed;
 
-            // 혹시 키가 다른 경우까지 방어적으로
-            Object id = map.get("id");
-            parsed = parsePositiveLong(id == null ? null : id.toString());
+            parsed = parsePositiveLong(toStr(map.get("id")));
             if (parsed != null) return parsed;
 
-            Object userId = map.get("userId");
-            parsed = parsePositiveLong(userId == null ? null : userId.toString());
+            parsed = parsePositiveLong(toStr(map.get("userId")));
             if (parsed != null) return parsed;
         }
 
-        // 3) 커스텀 principal에 getUserId()/getId()/getMemberId()가 있는 경우 리플렉션으로 대응
+        // 3) 커스텀 principal 메서드들
         for (String methodName : new String[]{"getUserId", "getId", "getMemberId"}) {
             try {
                 var m = p.getClass().getMethod(methodName);
-                Object id = m.invoke(p);
-                Long parsed = parsePositiveLong(id == null ? null : id.toString());
+                Long parsed = parsePositiveLong(toStr(m.invoke(p)));
                 if (parsed != null) return parsed;
             } catch (Exception ignored) {}
         }
@@ -74,16 +69,16 @@ public class FcmTestServiceImpl implements FcmTestService {
     }
 
     @Override
-    public FcmTestResponse sendTestToUser(Long userId) {
+    public FcmTestResponse sendTestToUser(Long userId, FcmSendRequest request) {
         if (userId == null || userId <= 0) {
             return FcmTestResponse.builder()
                     .success(false)
                     .message("Invalid userId from JWT principal")
-                    .detail("principal에서 userId 추출 실패. (authentication.getName / principal 구조 확인 필요)")
+                    .detail("userId 추출 실패: authentication.getName() / principal 구조 확인 필요")
                     .build();
         }
 
-        // 1) DB에서 활성 토큰 조회
+        // 1) 활성 토큰 조회
         FcmDeviceToken tokenEntity = tokenRepository
                 .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(userId)
                 .orElse(null);
@@ -92,23 +87,25 @@ public class FcmTestServiceImpl implements FcmTestService {
             return FcmTestResponse.builder()
                     .success(false)
                     .message("No active FCM token for this user")
-                    .detail("먼저 /api/v1/fcm/token/me 로 토큰 등록이 필요함")
+                    .detail("먼저 /api/v1/fcm/token/me 로 토큰 등록 필요")
                     .build();
         }
 
         String token = tokenEntity.getToken().trim();
 
-        // 2) 전송
+        // 2) request에서 title/body 반영 (없으면 기본값)
+        String title = (request == null || isBlank(request.getTitle())) ? DEFAULT_TITLE : request.getTitle().trim();
+        String body  = (request == null || isBlank(request.getBody()))  ? DEFAULT_BODY  : request.getBody().trim();
+
         try {
             String result = fcmService.sendMessageTo(
                     FcmSendDto.builder()
                             .token(token)
-                            .title("Unimate Test")
-                            .body("Hello from /api/v1/fcm/test/me")
+                            .title(title)
+                            .body(body)
                             .build()
             );
 
-            // fcmService가 "ERROR: ..." 문자열을 리턴할 수 있으니, 성공 여부를 문자열로도 한 번 더 반영
             boolean ok = result != null && result.startsWith("OK:");
 
             return FcmTestResponse.builder()
@@ -127,16 +124,20 @@ public class FcmTestServiceImpl implements FcmTestService {
         }
     }
 
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private String toStr(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
     private Long parsePositiveLong(String s) {
         if (s == null) return null;
         String t = s.trim();
         if (!t.matches("\\d+")) return null;
-        try {
-            long v = Long.parseLong(t);
-            return v > 0 ? v : null;
-        } catch (Exception e) {
-            return null;
-        }
+        long v = Long.parseLong(t);
+        return v > 0 ? v : null;
     }
 
     private String safeMsg(String msg) {

@@ -1,9 +1,12 @@
 package com.gdg.unimatebackend.app.alarm.service;
 
+import com.gdg.unimatebackend.app.alarm.dto.FcmSendRequest;
 import com.gdg.unimatebackend.app.alarm.dto.FcmTestResponse;
 import org.springframework.security.core.Authentication;
 
 public interface FcmTestService {
     Long extractUserId(Authentication authentication);
-    FcmTestResponse sendTestToUser(Long userId);
+
+    // ✅ request를 받아서 title/body 커스텀
+    FcmTestResponse sendTestToUser(Long userId, FcmSendRequest request);
 }
