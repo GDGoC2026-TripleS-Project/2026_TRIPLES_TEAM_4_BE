@@ -9,6 +9,7 @@ public interface FcmDeviceTokenRepository extends JpaRepository<FcmDeviceToken, 
 
     Optional<FcmDeviceToken> findByToken(String token);
 
-    // "내 토큰" 하나를 최신으로 가져오고 싶으면 updatedAt DESC 방식도 가능
     Optional<FcmDeviceToken> findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(Long userId);
+
+    void deleteByUserId(Long userId);
 }

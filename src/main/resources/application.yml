@@ -101,7 +101,7 @@ oauth:
 
 fcm:
   project-id: unimate-1d1d1
-  key-path: file:/app/firebase-key.json
+  key-path: classpath:firebase/unimate.json
 
   
 
