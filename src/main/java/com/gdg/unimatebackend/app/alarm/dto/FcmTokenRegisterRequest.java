@@ -9,7 +9,7 @@ public class FcmTokenRegisterRequest {
     @NotBlank
     private String token;
 
-    // 선택: 디바이스 식별/플랫폼(운영에서 유용)
-    private String deviceId;
-    private String platform;
+    // 프론트에서 넣어주면 정책이 완벽히 동작함 (권장)
+    private String deviceId;   // 예: ANDROID_ID / UUID 등
+    private String platform;   // 예: ANDROID
 }
