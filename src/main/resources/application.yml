@@ -21,7 +21,7 @@ spring:
     hibernate:
       ddl-auto: ${DDL_AUTO:create-drop}
     properties:
-      hibernate:
+      hibernate:  
         format_sql: false
     show-sql: false
     open-in-view: false
@@ -40,8 +40,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username: ${MAIL_USERNAME:seokhawnkim@gmail.com}
+    password: ${MAIL_PASSWORD:lhpzobtkpfvnstvd}
     properties:
       mail:
         smtp:
