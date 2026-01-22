@@ -18,34 +18,39 @@ public class FcmTokenServiceImpl implements FcmTokenService {
     @Override
     @Transactional
     public void register(Long userId, FcmTokenRegisterRequest request) {
-        String token = normalize(request.getToken());
-
+        String token = normalizeToken(request.getToken());
         validateNotJwtLike(token);
 
-        String deviceId = trimToNull(request.getDeviceId());
-        String platform = trimToNull(request.getPlatform());
+        String deviceId = normalizeDeviceId(request.getDeviceId());
+        String platform = normalizePlatform(request.getPlatform());
 
-        // 🔥 유저 기준 기존 토큰 비활성화
+        // ✅ A안: 유저당 활성 1개 (마지막 등록 디바이스만 수신)
         tokenRepository.deactivateAllByUserId(userId);
 
-        // 🔥 token unique 기반 업서트
-        tokenRepository.upsertByToken(userId, token, deviceId, platform);
+        // ✅ (user_id, device_id, platform) 기준 업서트
+        tokenRepository.upsertByDevice(userId, token, deviceId, platform);
 
-        log.info("[FCM] token registered. userId={}, tokenPrefix={}",
-                userId, token.substring(0, Math.min(12, token.length())));
+        log.info("[FCM] token registered. userId={}, platform={}, deviceId={}, tokenPrefix={}",
+                userId, platform, deviceId, token.substring(0, Math.min(12, token.length())));
     }
 
-    private String normalize(String token) {
+    private String normalizeToken(String token) {
         if (token == null || token.trim().isEmpty()) {
             throw new IllegalArgumentException("FCM token is required");
         }
         return token.trim();
     }
 
-    private String trimToNull(String v) {
-        if (v == null) return null;
-        String t = v.trim();
-        return t.isEmpty() ? null : t;
+    private String normalizeDeviceId(String v) {
+        // 프론트가 deviceId를 안 보내면 "디바이스 단위 식별"이 불가능해짐.
+        // 그래도 서버가 깨지지 않게 최소 폴백을 둔다.
+        if (v == null || v.trim().isEmpty()) return "UNKNOWN";
+        return v.trim();
+    }
+
+    private String normalizePlatform(String v) {
+        if (v == null || v.trim().isEmpty()) return "UNKNOWN";
+        return v.trim().toUpperCase();
     }
 
     private void validateNotJwtLike(String token) {
