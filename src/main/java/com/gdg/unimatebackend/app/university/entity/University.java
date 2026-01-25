@@ -5,7 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(
-        name = "universities",
+        name = "university",
         indexes = {
                 @Index(name = "idx_university_name", columnList = "name")
         }
@@ -20,6 +20,6 @@ public class University {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 100, unique = true)
+    @Column(nullable = false, length = 255, unique = true)
     private String name;
 }
