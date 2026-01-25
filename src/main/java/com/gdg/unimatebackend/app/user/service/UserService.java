@@ -1,17 +1,16 @@
 package com.gdg.unimatebackend.app.user.service;
 
 import com.gdg.unimatebackend.app.auth.service.AuthService;
+import com.gdg.unimatebackend.app.university.entity.University;
+import com.gdg.unimatebackend.app.university.repository.UniversityRepository;
+import com.gdg.unimatebackend.app.user.dto.ProfileUpsertRequest;
 import com.gdg.unimatebackend.app.user.dto.UserResponse;
-import com.gdg.unimatebackend.app.user.dto.UserUpdateRequest;
 import com.gdg.unimatebackend.app.user.entity.User;
 import com.gdg.unimatebackend.app.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
 
 @Service
 @RequiredArgsConstructor
@@ -19,36 +18,48 @@ import java.io.IOException;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UniversityRepository universityRepository;
     private final AuthService authService;
+
+    @Transactional
+    public UserResponse upsertProfile(Long userId, ProfileUpsertRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+
+        // 닉네임 변경이면 중복 체크
+        if (!request.getNickname().equals(user.getNickname())) {
+            authService.checkNicknameDuplicate(request.getNickname());
+            user.updateNickname(request.getNickname());
+        }
+
+        // 학교 FK 세팅
+        University uni = universityRepository.findById(request.getUniversityId())
+                .orElseThrow(() -> new IllegalArgumentException("학교를 찾을 수 없습니다"));
+        user.updateUniversity(uni);
+
+        // 이미지 URL은 덮어쓰기(선택)
+        if (request.getProfileImageUrl() != null) {
+            user.updateProfileImageUrl(request.getProfileImageUrl());
+        }
+
+        return convertToResponse(user);
+    }
 
     @Transactional(readOnly = true)
     public UserResponse getUserInfo(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-
-        return convertToResponse(user);
-    }
-
-    @Transactional
-    public UserResponse updateProfile(Long userId, UserUpdateRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
-
-        // 닉네임 변경 요청이 있고, 현재 닉네임과 다르면 중복 체크
-        if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
-            String oldNickname = user.getNickname();
-            authService.checkNicknameDuplicate(request.getNickname());
-            user.updateNickname(request.getNickname());
-            log.info("사용자 {} 닉네임 변경: {} -> {}", userId, oldNickname, request.getNickname());
-        }
-
-        // 프로필 정보 업데이트 (이름, 생년월일, 성별, 연락처)
-        user.updateProfile(request.getName(), request.getBirthDate(), request.getGender(), request.getPhoneNumber());
-
         return convertToResponse(user);
     }
 
     private UserResponse convertToResponse(User user) {
+        Long uniId = (user.getUniversity() == null) ? null : user.getUniversity().getId();
+        String uniName = (user.getUniversity() == null) ? null : user.getUniversity().getName();
+
+        boolean completed =
+                user.getNickname() != null && !user.getNickname().isBlank()
+                        && uniId != null;
+
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -58,13 +69,11 @@ public class UserService {
                 .providerId(user.getProviderId())
                 .active(user.getActive())
                 .profileImageUrl(user.getProfileImageUrl())
-                .name(user.getName())
-                .birthDate(user.getBirthDate())
-                .gender(user.getGender())
-                .phoneNumber(user.getPhoneNumber())
+                .universityId(uniId)
+                .universityName(uniName)
+                .profileCompleted(completed)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }
-

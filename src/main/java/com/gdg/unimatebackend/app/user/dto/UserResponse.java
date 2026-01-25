@@ -29,5 +29,8 @@ public class UserResponse {
     private String phoneNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long universityId;
+    private String universityName;
+    private Boolean profileCompleted;
 }
 

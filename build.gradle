@@ -68,6 +68,12 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // AWS SDK v1 BOM (버전 충돌 방지)
+    implementation platform("com.amazonaws:aws-java-sdk-bom:1.12.782")
+
+    // S3
+    implementation "com.amazonaws:aws-java-sdk-s3"
+
 }
 
 tasks.named('test') {
