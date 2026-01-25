@@ -32,16 +32,15 @@ spring:
 
   servlet:
     multipart:
-      enabled: true
-      max-file-size: 100MB
-      max-request-size: 500MB
-      file-size-threshold: 2KB
+      max-file-size: 10MB
+      max-request-size: 10MB
+      file-size-threshold: 2MB
 
   mail:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username: ${MAIL_USERNAME:seokhawnkim@gmail.com}
+    password: ${MAIL_PASSWORD:lhpzobtkpfvnstvd}
     properties:
       mail:
         smtp:
@@ -71,9 +70,9 @@ aws:
   s3:
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
-    bucket-name: ${AWS_S3_BUCKET_NAME:}
-    base-url: ${AWS_S3_BASE_URL:}
     region: ${AWS_S3_REGION:ap-northeast-2}
+    bucket-name: ${AWS_S3_BUCKET:seok-hwan-bucket}
+    base-url: ${AWS_S3_BASE_URL:https://seok-hwan-bucket.s3.ap-northeast-2.amazonaws.com}
 
 app:
   swagger:

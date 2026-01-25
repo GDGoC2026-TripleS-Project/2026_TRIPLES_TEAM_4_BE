@@ -28,7 +28,7 @@ public class User {
     @Column(name = "password", length = 255)
     private String password;  // 소셜 로그인 사용자는 null 가능
 
-    @Column(name = "nickname", nullable = false, unique = true, length = 50)
+    @Column(name="nickname", unique = true, length=50)
     private String nickname;
 
     @Column(name = "email_verified", nullable = false)
@@ -78,16 +78,19 @@ public class User {
         this.active = false;
     }
 
-    public void verifyEmail() {
-        this.emailVerified = true;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id")
+    private com.gdg.unimatebackend.app.university.entity.University university;
+
+    public void updateUniversity(com.gdg.unimatebackend.app.university.entity.University university) {
+        this.university = university;
     }
 
-    /**
-     * 소셜 로그인 계정 연결 (providerId 추가)
-     * 이메일 로그인 사용자가 소셜 로그인을 연동할 때 사용
-     */
-    public void linkSocialProvider(String providerId) {
-        this.providerId = providerId;
+    @Column(name = "profile_image_key", length = 300)
+    private String profileImageKey;
+
+    public void updateProfileImageKey(String key) {
+        this.profileImageKey = key;
     }
 
     /**
@@ -109,6 +112,7 @@ public class User {
      */
     public void deleteProfileImage() {
         this.profileImageUrl = null;
+        this.profileImageKey = null;
     }
 
     /**
