@@ -1,5 +1,6 @@
 package com.gdg.unimatebackend.global.exception;
 
+import com.gdg.unimatebackend.app.team.exception.TeamException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,28 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(TeamException.class)
+    public ResponseEntity<Map<String, Object>> handleTeamException(TeamException e) {
+        return ResponseEntity
+                .status(e.getStatus())
+                .body(Map.of(
+                        "code", e.getCode(),
+                        "message", e.getMessage(),
+                        "status", e.getStatus()
+                ));
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
+        return ResponseEntity
+                .status(500)
+                .body(Map.of(
+                        "code", "INTERNAL_SERVER_ERROR",
+                        "message", e.getMessage(),
+                        "status", 500
+                ));
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {

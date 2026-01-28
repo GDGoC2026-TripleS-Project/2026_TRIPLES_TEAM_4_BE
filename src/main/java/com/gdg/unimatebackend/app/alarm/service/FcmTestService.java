@@ -7,6 +7,6 @@ import org.springframework.security.core.Authentication;
 public interface FcmTestService {
     Long extractUserId(Authentication authentication);
 
-    // ✅ request를 받아서 title/body 커스텀
+    // request를 받아서 title/body 커스텀
     FcmTestResponse sendTestToUser(Long userId, FcmSendRequest request);
 }
