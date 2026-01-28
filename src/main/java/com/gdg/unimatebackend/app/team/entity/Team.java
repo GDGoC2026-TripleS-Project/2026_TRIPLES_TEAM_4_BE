@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "teams", // ✅ DB 테이블명과 일치
+        name = "teams",
         indexes = {
                 @Index(name = "idx_teams_owner", columnList = "owner_user_id")
         }
@@ -24,16 +24,15 @@ public class Team {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 60) // ✅ DB가 varchar(60)
+    @Column(nullable = false, length = 60) // -
     private String name;
 
-    // DB에는 description/color 컬럼이 아직 없을 수도 있음.
-    // 이미 운영 DB에 없다면, 아래 2개는 "DDL 추가"하거나, 당장 쓰지 않으면 제거해도 됨.
     @Column(length = 300)
     private String description;
 
-    @Column(length = 30)
-    private String color;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, updatable = false, length = 20)
+    private TeamColor color;
 
     @Column(name = "owner_user_id")
     private Long ownerUserId;
@@ -46,7 +45,6 @@ public class Team {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ✅ teams 컬럼만 사용
     @Column(name = "invite_code", length = 6, unique = true)
     private String inviteCode;
 
@@ -63,9 +61,8 @@ public class Team {
         this.inviteCodeExpiresAt = null;
     }
 
-    public void update(String name, String description, String color) {
+    public void update(String name, String description) {
         if (name != null && !name.isBlank()) this.name = name;
         if (description != null) this.description = description;
-        if (color != null) this.color = color;
     }
 }

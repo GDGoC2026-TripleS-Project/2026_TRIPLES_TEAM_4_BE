@@ -191,4 +191,37 @@ public class TeamController {
         Long userId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(teamService.joinByInviteCode(userId, request));
     }
+
+    @Operation(
+            summary = "사용 가능한 팀 색상",
+            description = """
+                    초대코드로 팀에 참여합니다.
+                    이미 있는 팀의 색상의 컬러는 사용 불가합니다
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @GetMapping("/colors/available")
+    public ResponseEntity<List<TeamColorResponse>> getAvailableColors(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(teamService.getAvailableColors(userId));
+    }
+
+    @Operation(
+            summary = "초대코드 조회",
+            description = """
+                팀 초대코드를 조회합니다.
+                - 팀 멤버만 조회 가능합니다.
+                - 초대코드가 없거나(발급 전) 만료된 경우 에러를 반환합니다.
+                """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @GetMapping("/{teamId}/invite")
+    public ResponseEntity<TeamInviteCodeResponse> getInviteCode(
+            Authentication authentication,
+            @Parameter(description = "팀 ID", example = "1")
+            @PathVariable Long teamId
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(teamService.getInviteCode(userId, teamId));
+    }
 }
