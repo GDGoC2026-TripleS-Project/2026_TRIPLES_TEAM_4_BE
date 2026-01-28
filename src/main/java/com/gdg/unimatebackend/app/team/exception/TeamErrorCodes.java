@@ -10,4 +10,5 @@ public final class TeamErrorCodes {
     public static final String INVITE_CODE_INVALID = "INVITE_CODE_INVALID";
     public static final String INVITE_CODE_EXPIRED = "INVITE_CODE_EXPIRED";
     public static final String LEADER_CANNOT_LEAVE = "LEADER_CANNOT_LEAVE";
+    public static final String INVITE_CODE_NOT_ISSUED = "INVITE_CODE_NOT_ISSUED";
 }

@@ -374,4 +374,35 @@ public class TeamService {
                 .updatedAt(team.getUpdatedAt())
                 .build();
     }
+
+    @Transactional(readOnly = true)
+    public TeamInviteCodeResponse getInviteCode(Long userId, Long teamId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new TeamException(
+                        TeamErrorCodes.TEAM_NOT_FOUND, "팀을 찾을 수 없습니다", 404
+                ));
+
+        // 팀 멤버만 조회 가능
+        if (!teamMemberRepository.existsByTeamIdAndUserId(teamId, userId)) {
+            throw new TeamException(TeamErrorCodes.NOT_A_MEMBER, "팀 멤버만 접근할 수 있습니다", 403);
+        }
+
+        if (team.getInviteCode() == null || team.getInviteCode().isBlank() || team.getInviteCodeExpiresAt() == null) {
+            throw new TeamException(
+                    TeamErrorCodes.INVITE_CODE_NOT_ISSUED, "초대코드가 아직 발급되지 않았습니다", 404
+            );
+        }
+
+        if (team.getInviteCodeExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new TeamException(
+                    TeamErrorCodes.INVITE_CODE_EXPIRED, "초대코드가 만료되었습니다", 400
+            );
+        }
+
+        return TeamInviteCodeResponse.builder()
+                .teamId(teamId)
+                .inviteCode(team.getInviteCode())
+                .expiresAt(team.getInviteCodeExpiresAt())
+                .build();
+    }
 }

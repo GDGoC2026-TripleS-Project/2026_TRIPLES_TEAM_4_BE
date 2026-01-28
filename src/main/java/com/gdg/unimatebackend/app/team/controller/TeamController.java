@@ -205,4 +205,23 @@ public class TeamController {
         Long userId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(teamService.getAvailableColors(userId));
     }
+
+    @Operation(
+            summary = "초대코드 조회",
+            description = """
+                팀 초대코드를 조회합니다.
+                - 팀 멤버만 조회 가능합니다.
+                - 초대코드가 없거나(발급 전) 만료된 경우 에러를 반환합니다.
+                """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @GetMapping("/{teamId}/invite")
+    public ResponseEntity<TeamInviteCodeResponse> getInviteCode(
+            Authentication authentication,
+            @Parameter(description = "팀 ID", example = "1")
+            @PathVariable Long teamId
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(teamService.getInviteCode(userId, teamId));
+    }
 }
