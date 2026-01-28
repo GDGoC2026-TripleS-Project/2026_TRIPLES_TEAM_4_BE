@@ -2,14 +2,17 @@ package com.gdg.unimatebackend.app.team.service;
 
 import com.gdg.unimatebackend.app.team.dto.*;
 import com.gdg.unimatebackend.app.team.entity.*;
-import com.gdg.unimatebackend.app.team.exception.TeamException;
+import com.gdg.unimatebackend.app.team.event.TeamJoinedEvent;
+import com.gdg.unimatebackend.app.team.event.TeamLeftEvent;
 import com.gdg.unimatebackend.app.team.exception.TeamErrorCodes;
+import com.gdg.unimatebackend.app.team.exception.TeamException;
 import com.gdg.unimatebackend.app.team.repository.TeamMemberRepository;
 import com.gdg.unimatebackend.app.team.repository.TeamRepository;
 import com.gdg.unimatebackend.app.user.entity.User;
 import com.gdg.unimatebackend.app.user.repository.UserRepository;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,7 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -140,12 +144,8 @@ public class TeamService {
     }
 
     // ===== 팀 색상(선택 가능 목록) =====
-    // 이제는 "중복 금지"가 아니라 "가입 시 자동 재배정"이므로
-    // available은 UX용(선택지를 보여주기)으로만 사용.
     @Transactional(readOnly = true)
     public List<TeamColorResponse> getAvailableColors(Long userId) {
-        // 사용 가능 목록은 그냥 전체를 내려도 되지만,
-        // 기존 UX를 유지하려면 "현재 내가 쓰는 displayColor 제외"로 내려주면 깔끔.
         Set<TeamColor> used = new HashSet<>(teamMemberRepository.findDistinctDisplayColorsByUserId(userId));
 
         List<TeamColorResponse> result = new ArrayList<>();
@@ -193,6 +193,9 @@ public class TeamService {
         }
 
         teamMemberRepository.deleteByTeamIdAndUserId(teamId, userId);
+
+        // 탈퇴 성공 시(커밋 이후) 남은 팀원들에게 알림
+        eventPublisher.publishEvent(new TeamLeftEvent(teamId, userId));
     }
 
     // ===== 팀원 목록 조회 =====
@@ -263,6 +266,9 @@ public class TeamService {
                             .joinedAt(LocalDateTime.now())
                             .build()
             );
+
+            // 신규가입 때만(커밋 이후) 다른 팀원들에게 알림
+            eventPublisher.publishEvent(new TeamJoinedEvent(teamId, userId));
         }
 
         List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(teamId);
@@ -278,11 +284,8 @@ public class TeamService {
                 .build();
     }
 
-    // ===== helpers =====
-
     // 중복 제외 랜덤 배정 로직 (요구사항 핵심)
     private TeamColor assignDisplayColorForUser(Long userId, TeamColor teamColor) {
-        // 유저가 이미 사용 중인 displayColor 집합
         Set<TeamColor> used = new HashSet<>(teamMemberRepository.findDistinctDisplayColorsByUserId(userId));
 
         // 기본은 팀 대표색
@@ -315,7 +318,6 @@ public class TeamService {
                     .universityName(resolveUniversityName(u))
                     .role(m.getRole())
                     .joinedAt(m.getJoinedAt())
-                    // 멤버별 표시색 내려주기
                     .displayColor(dc)
                     .displayColorHex(dc != null ? dc.getHex() : null)
                     .build();
@@ -366,7 +368,6 @@ public class TeamService {
                 .id(team.getId())
                 .name(team.getName())
                 .description(team.getDescription())
-                // 팀 대표색도 내려주되,
                 .color(team.getColor())
                 .colorHex(team.getColor() != null ? team.getColor().getHex() : null)
                 .ownerUserId(team.getOwnerUserId())

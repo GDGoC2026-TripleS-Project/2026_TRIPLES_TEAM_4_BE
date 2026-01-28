@@ -10,6 +10,6 @@ public class FcmTokenRegisterRequest {
     private String token;
 
     // 프론트에서 넣어주면 정책이 완벽히 동작함 (권장)
-    private String deviceId;   // 예: ANDROID_ID / UUID 등
+    private String deviceId;
     private String platform;   // 예: ANDROID
 }
