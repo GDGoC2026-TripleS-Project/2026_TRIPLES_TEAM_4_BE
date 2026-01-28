@@ -11,7 +11,4 @@ public class TeamUpdateRequest {
 
     @Size(max = 300)
     private String description;
-
-    @Size(max = 30)
-    private String color;
 }

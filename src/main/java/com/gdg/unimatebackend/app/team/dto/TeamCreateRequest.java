@@ -1,7 +1,9 @@
 package com.gdg.unimatebackend.app.team.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.gdg.unimatebackend.app.team.entity.TeamColor;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 
 @Getter
@@ -14,6 +16,6 @@ public class TeamCreateRequest {
     @Size(max = 300)
     private String description;
 
-    @Size(max = 30)
-    private String color;
+    @NotNull
+    private TeamColor color;
 }

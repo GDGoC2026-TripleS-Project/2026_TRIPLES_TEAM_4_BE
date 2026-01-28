@@ -191,4 +191,18 @@ public class TeamController {
         Long userId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(teamService.joinByInviteCode(userId, request));
     }
+
+    @Operation(
+            summary = "사용 가능한 팀 색상",
+            description = """
+                    초대코드로 팀에 참여합니다.
+                    이미 있는 팀의 색상의 컬러는 사용 불가합니다
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @GetMapping("/colors/available")
+    public ResponseEntity<List<TeamColorResponse>> getAvailableColors(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        return ResponseEntity.ok(teamService.getAvailableColors(userId));
+    }
 }

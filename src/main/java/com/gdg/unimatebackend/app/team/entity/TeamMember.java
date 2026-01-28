@@ -2,25 +2,15 @@ package com.gdg.unimatebackend.app.team.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "team_member",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_team_member_team_user", columnNames = {"team_id", "user_id"})
-        },
-        indexes = {
-                @Index(name = "idx_team_member_user", columnList = "user_id"),
-                @Index(name = "idx_team_member_team", columnList = "team_id")
-        }
-)
 @Getter
-@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
+@Builder
+@Table(name = "team_member")
 public class TeamMember {
 
     @Id
@@ -37,7 +27,15 @@ public class TeamMember {
     @Column(nullable = false, length = 20)
     private TeamRole role;
 
-    @CreationTimestamp
-    @Column(name = "joined_at", nullable = false, updatable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "display_color", nullable = false, length = 20)
+    private TeamColor displayColor;
+
+    @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
+
+    @PrePersist
+    void prePersist() {
+        if (joinedAt == null) joinedAt = LocalDateTime.now();
+    }
 }
