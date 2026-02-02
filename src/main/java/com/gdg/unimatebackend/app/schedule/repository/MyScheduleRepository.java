@@ -51,4 +51,18 @@ public interface MyScheduleRepository extends JpaRepository<MySchedule, Long> {
             @Param("userId") Long userId,
             @Param("now") LocalDateTime now
     );
+
+    @Query("""
+    select distinct s.userId
+    from MySchedule s
+    where s.teamId = :teamId
+      and s.userId in :userIds
+      and s.startAt <= :now
+      and s.endAt > :now
+""")
+    List<Long> findBusyUserIdsNow(
+            @Param("teamId") Long teamId,
+            @Param("userIds") List<Long> userIds,
+            @Param("now") LocalDateTime now
+    );
 }
