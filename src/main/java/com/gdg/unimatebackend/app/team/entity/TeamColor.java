@@ -6,11 +6,17 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum TeamColor {
-    RED("#EF4444"),
-    YELLOW("#F59E0B"),
-    GREEN("#22C55E"),
-    BLUE("#3B82F6"),
-    PURPLE("#8B5CF6");
+
+    C01("#FFE970"),
+    C02("#FFF8D3"),
+    C03("#90A3ED"),
+    C04("#D9E1FF"),
+    C05("#F488D4"),
+    C06("#FFD8F3"),
+    C07("#FF7A6E"),
+    C08("#FBB0A9"),
+    C09("#9CE098"),
+    C10("#D4FFD1");
 
     private final String hex;
 }
