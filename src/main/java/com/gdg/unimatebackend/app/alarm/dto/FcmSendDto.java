@@ -6,6 +6,8 @@ package com.gdg.unimatebackend.app.alarm.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
+import java.util.Map;
+
 @Getter
 @ToString
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -20,10 +22,13 @@ public class FcmSendDto {
     @NotBlank
     private String body;
 
+    private Map<String, String> data;
+
     @Builder
-    public FcmSendDto(String token, String title, String body) {
+    public FcmSendDto(String token, String title, String body, Map<String, String> data) {
         this.token = token;
         this.title = title;
         this.body = body;
+        this.data = data;
     }
 }

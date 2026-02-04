@@ -169,8 +169,12 @@ public class FcmServiceImpl implements FcmService {
         message.put("notification", notification);
 
         Map<String, String> data = new HashMap<>();
-        data.put("type", "TEST");
-        data.put("sentAt", Instant.now().toString());
+        if (dto.getData() != null && !dto.getData().isEmpty()) {
+            data.putAll(dto.getData());
+        } else {
+            data.put("type", "TEST");
+            data.put("sentAt", Instant.now().toString());
+        }
         message.put("data", data);
 
         Map<String, Object> android = new HashMap<>();
