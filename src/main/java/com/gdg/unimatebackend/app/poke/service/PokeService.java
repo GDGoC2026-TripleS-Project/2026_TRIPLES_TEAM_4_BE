@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gdg.unimatebackend.app.poke.event.PokeSentEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.*;
 
@@ -25,6 +27,7 @@ public class PokeService {
     private final PokeMessageRepository pokeMessageRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final PokeQueryRepository pokeQueryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // =========================
     // 찌르기 대상 조회 (/targets)
@@ -164,6 +167,18 @@ public class PokeService {
 
         if (!pokesToSave.isEmpty()) {
             pokeRepository.saveAll(pokesToSave);
+
+            // 커밋 이후 FCM 발송 트리거
+            var targetUserIds = pokesToSave.stream()
+                    .map(Poke::getTargetUserId)
+                    .distinct()
+                    .toList();
+
+            eventPublisher.publishEvent(new PokeSentEvent(
+                    senderId,
+                    pokeMessage.getId(),
+                    targetUserIds
+            ));
         }
 
         log.info("[POKE] sender={}, sent={}, invalid={}, excludedSelf={}",
