@@ -14,7 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.gdg.unimatebackend.app.poke.event.PokeSentEvent;
+import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -25,6 +28,7 @@ public class PokeService {
     private final PokeMessageRepository pokeMessageRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final PokeQueryRepository pokeQueryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // =========================
     // 찌르기 대상 조회 (/targets)
@@ -89,6 +93,7 @@ public class PokeService {
         // ---- 1) 찌르기 문구 조회 ----
         PokeMessage pokeMessage = pokeMessageRepository.findById(request.getMessageId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 찌르기 문구입니다."));
+        Long messageId = pokeMessage.getId();
 
         // ---- 2) targets 정리 (null 제거 + dedup + 본인 제외) ----
         int excludedSelfCount = 0;
@@ -120,6 +125,7 @@ public class PokeService {
 
         List<Poke> pokesToSave = new ArrayList<>();
         List<PokeResponse.InvalidTarget> invalidTargets = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
 
         for (PokeRequest.Target t : uniqueTargets.values()) {
 
@@ -153,6 +159,24 @@ public class PokeService {
                 continue;
             }
 
+            // (3) 동일 메시지 24시간 쿨다운
+            Optional<Poke> lastPokeOpt = pokeRepository
+                    .findTopByTeamIdAndSenderIdAndTargetUserIdAndPokeMessageIdOrderByCreatedAtDesc(
+                            teamId, senderId, targetUserId, messageId
+                    );
+
+            if (lastPokeOpt.isPresent()) {
+                LocalDateTime lastCreatedAt = lastPokeOpt.get().getCreatedAt();
+                if (lastCreatedAt != null && now.isBefore(lastCreatedAt.plusHours(24))) {
+                    invalidTargets.add(PokeResponse.InvalidTarget.builder()
+                            .teamId(teamId)
+                            .userId(targetUserId)
+                            .reason("COOLDOWN_24H")
+                            .build());
+                    continue;
+                }
+            }
+
             // (3) 유효 → Poke 생성
             pokesToSave.add(Poke.builder()
                     .teamId(teamId)
@@ -164,6 +188,18 @@ public class PokeService {
 
         if (!pokesToSave.isEmpty()) {
             pokeRepository.saveAll(pokesToSave);
+
+            // 커밋 이후 FCM 발송 트리거
+            var targetUserIds = pokesToSave.stream()
+                    .map(Poke::getTargetUserId)
+                    .distinct()
+                    .toList();
+
+            eventPublisher.publishEvent(new PokeSentEvent(
+                    senderId,
+                    pokeMessage.getId(),
+                    targetUserIds
+            ));
         }
 
         log.info("[POKE] sender={}, sent={}, invalid={}, excludedSelf={}",

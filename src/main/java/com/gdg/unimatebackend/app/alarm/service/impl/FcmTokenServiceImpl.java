@@ -21,17 +21,19 @@ public class FcmTokenServiceImpl implements FcmTokenService {
         String token = normalizeToken(request.getToken());
         validateNotJwtLike(token);
 
-        String deviceId = normalizeDeviceId(request.getDeviceId());
+        // ✅ deviceId/platform 방어 (빈값이면 upsert키가 흔들려서 토큰 갱신이 꼬일 수 있음)
+        String deviceId = normalizeDeviceId(request.getDeviceId(), userId);
         String platform = normalizePlatform(request.getPlatform());
 
-        // ✅ A안: 유저당 활성 1개 (마지막 등록 디바이스만 수신)
+        // ✅ (A안) 유저당 활성 1개만 유지: 마지막 등록 디바이스만 수신
+        // (중요) static 호출 금지. 주입받은 repository 인스턴스로 호출해야 함.
         tokenRepository.deactivateAllByUserId(userId);
 
-        // ✅ (user_id, device_id, platform) 기준 업서트
-        tokenRepository.upsertByDevice(userId, token, deviceId, platform);
+        // ✅ (user_id, device_id, platform) 기준 UPSERT
+        int affected = tokenRepository.upsertByDevice(userId, token, deviceId, platform);
 
-        log.info("[FCM] token registered. userId={}, platform={}, deviceId={}, tokenPrefix={}",
-                userId, platform, deviceId, token.substring(0, Math.min(12, token.length())));
+        log.info("[FCM] token registered. userId={}, deviceId={}, platform={}, affected={}",
+                userId, deviceId, platform, affected);
     }
 
     private String normalizeToken(String token) {
@@ -41,16 +43,20 @@ public class FcmTokenServiceImpl implements FcmTokenService {
         return token.trim();
     }
 
-    private String normalizeDeviceId(String v) {
+    private String normalizeDeviceId(String deviceId, Long userId) {
         // 프론트가 deviceId를 안 보내면 "디바이스 단위 식별"이 불가능해짐.
         // 그래도 서버가 깨지지 않게 최소 폴백을 둔다.
-        if (v == null || v.trim().isEmpty()) return "UNKNOWN";
-        return v.trim();
+        if (deviceId == null || deviceId.trim().isEmpty()) {
+            return "unknown-" + userId; // user별로라도 고정되게
+        }
+        return deviceId.trim();
     }
 
-    private String normalizePlatform(String v) {
-        if (v == null || v.trim().isEmpty()) return "UNKNOWN";
-        return v.trim().toUpperCase();
+    private String normalizePlatform(String platform) {
+        if (platform == null || platform.trim().isEmpty()) {
+            return "ANDROID"; // 네 정책대로 기본 ANDROID
+        }
+        return platform.trim().toUpperCase();
     }
 
     private void validateNotJwtLike(String token) {
