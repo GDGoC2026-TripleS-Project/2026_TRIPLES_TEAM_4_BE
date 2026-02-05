@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -35,12 +36,15 @@ public class TeamService {
     // ===== 팀 생성 =====
     @Transactional
     public TeamResponse createTeam(Long userId, TeamCreateRequest request) {
+        validateTeamPeriod(request.getStartAt(), request.getEndAt());
 
         Team team = Team.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .color(request.getColor()) // 팀 대표색 고정
                 .ownerUserId(userId)
+                .startAt(request.getStartAt())
+                .endAt(request.getEndAt())
                 .build();
 
         team = teamRepository.save(team);
@@ -94,6 +98,9 @@ public class TeamService {
                     .colorHex(myDisplayColor != null ? myDisplayColor.getHex() : null)
                     .myRole(myRole)
                     .memberCount(memberCount)
+                    .startAt(t.getStartAt())
+                    .endAt(t.getEndAt())
+                    .isCompleted(isCompleted(t.getEndAt()))
                     .createdAt(t.getCreatedAt())
                     .updatedAt(t.getUpdatedAt())
                     .build());
@@ -139,7 +146,12 @@ public class TeamService {
         requireLeader(teamId, userId, team);
 
         // 정책: color 변경 불가 (name/description만)
-        team.update(request.getName(), request.getDescription());
+        if (request.getStartAt() != null || request.getEndAt() != null) {
+            LocalDate newStart = (request.getStartAt() != null) ? request.getStartAt() : team.getStartAt();
+            LocalDate newEnd = (request.getEndAt() != null) ? request.getEndAt() : team.getEndAt();
+            validateTeamPeriod(newStart, newEnd);
+        }
+        team.update(request.getName(), request.getDescription(), request.getStartAt(), request.getEndAt());
         return toTeamResponse(team);
     }
 
@@ -371,9 +383,25 @@ public class TeamService {
                 .color(team.getColor())
                 .colorHex(team.getColor() != null ? team.getColor().getHex() : null)
                 .ownerUserId(team.getOwnerUserId())
+                .startAt(team.getStartAt())
+                .endAt(team.getEndAt())
+                .isCompleted(isCompleted(team.getEndAt()))
                 .createdAt(team.getCreatedAt())
                 .updatedAt(team.getUpdatedAt())
                 .build();
+    }
+
+    private void validateTeamPeriod(LocalDate startAt, LocalDate endAt) {
+        if (startAt == null || endAt == null) {
+            throw new TeamException(TeamErrorCodes.FORBIDDEN, "startAt/endAt은 필수입니다", 400);
+        }
+        if (endAt.isBefore(startAt)) {
+            throw new TeamException(TeamErrorCodes.FORBIDDEN, "endAt은 startAt보다 빠를 수 없습니다", 400);
+        }
+    }
+
+    private boolean isCompleted(LocalDate endAt) {
+        return endAt != null && endAt.isBefore(LocalDate.now());
     }
 
     @Transactional(readOnly = true)

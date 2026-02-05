@@ -2,9 +2,11 @@ package com.gdg.unimatebackend.app.team.dto;
 
 import com.gdg.unimatebackend.app.team.entity.TeamColor;
 import com.gdg.unimatebackend.app.team.entity.TeamRole;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -17,6 +19,10 @@ public class TeamSummaryResponse {
     private String colorHex;
     private TeamRole myRole;
     private long memberCount;
+    private LocalDate startAt;
+    private LocalDate endAt;
+    @JsonProperty("isCompleted")
+    private boolean isCompleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
