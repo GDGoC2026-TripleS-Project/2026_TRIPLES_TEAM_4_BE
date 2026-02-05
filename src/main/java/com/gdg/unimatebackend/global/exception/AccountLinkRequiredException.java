@@ -1,6 +1,6 @@
 package com.gdg.unimatebackend.global.exception;
 
-import com.gdg.unimatebackend.app.user.entity.AuthProvider;
+import com.gdg.unimatebackend.user.entity.AuthProvider;
 import lombok.Getter;
 
 /**

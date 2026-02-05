@@ -1,6 +1,6 @@
 package com.gdg.unimatebackend.global.exception;
 
-import com.gdg.unimatebackend.app.team.exception.TeamException;
+import com.gdg.unimatebackend.team.exception.TeamException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
