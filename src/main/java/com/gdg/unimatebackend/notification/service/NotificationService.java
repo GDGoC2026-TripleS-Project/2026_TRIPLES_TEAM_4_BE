@@ -21,6 +21,9 @@ public class NotificationService {
 
     @Transactional
     public Notification createNotificationWithReceipts(Notification notification, List<Long> targetUserIds) {
+        if (notification == null) {
+            throw new IllegalArgumentException("notification is null");
+        }
         Notification saved = saveNotificationIdempotent(notification);
         createReceiptsIdempotent(saved, targetUserIds);
         return saved;
@@ -28,10 +31,21 @@ public class NotificationService {
 
     private Notification saveNotificationIdempotent(Notification notification) {
         try {
-            return notificationRepository.save(notification);
+            Notification saved = notificationRepository.save(notification);
+            notificationRepository.flush();
+            org.slf4j.LoggerFactory.getLogger(NotificationService.class)
+                    .info("[NOTI] saved. id={}, eventKey={}", saved.getId(), saved.getEventKey());
+            return saved;
         } catch (DataIntegrityViolationException e) {
+            org.slf4j.LoggerFactory.getLogger(NotificationService.class)
+                    .error("[NOTI] save failed (DataIntegrityViolation). eventKey={}",
+                            notification.getEventKey(), e);
             return notificationRepository.findByEventKey(notification.getEventKey())
                     .orElseThrow(() -> e);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(NotificationService.class)
+                    .error("[NOTI] save failed. eventKey={}", notification.getEventKey(), e);
+            throw e;
         }
     }
 
@@ -51,7 +65,14 @@ public class NotificationService {
                     .isRead(false)
                     .build();
 
-            created.add(notificationReceiptRepository.save(receipt));
+            try {
+                created.add(notificationReceiptRepository.save(receipt));
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(NotificationService.class)
+                        .error("[NOTI] receipt save failed. notificationId={}, userId={}",
+                                notification.getId(), userId, e);
+                throw e;
+            }
         }
         return created;
     }
