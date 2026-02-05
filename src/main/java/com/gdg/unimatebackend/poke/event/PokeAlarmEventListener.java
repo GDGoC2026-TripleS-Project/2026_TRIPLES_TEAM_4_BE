@@ -33,8 +33,13 @@ public class PokeAlarmEventListener {
     private final NotificationService notificationService;
     private final EntityManager em;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @TransactionalEventListener(
+            phase = TransactionPhase.AFTER_COMMIT,
+            fallbackExecution = true
+    )
     public void handle(PokeSentEvent event) {
+        log.info("[POKE][NOTI] listener fired. senderId={}, messageId={}, targets={}",
+                event.getSenderId(), event.getPokeMessageId(), event.getTargetUserIds());
         // ✅ 캡쳐 문구 템플릿
         PokeAlarmTypeMapper.PokeAlarmTemplate template =
                 PokeAlarmTypeMapper.fromMessageId(event.getPokeMessageId());

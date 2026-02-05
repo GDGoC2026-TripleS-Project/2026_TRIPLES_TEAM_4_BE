@@ -1,6 +1,8 @@
 package com.gdg.unimatebackend.notification.service;
 
+import com.gdg.unimatebackend.notification.entity.DdayMessageTemplate;
 import com.gdg.unimatebackend.notification.entity.Notification;
+import com.gdg.unimatebackend.notification.repository.DdayMessageTemplateRepository;
 import com.gdg.unimatebackend.schedule.team.entity.TeamSchedule;
 import com.gdg.unimatebackend.schedule.team.repository.TeamScheduleRepository;
 import com.gdg.unimatebackend.team.entity.Team;
@@ -27,6 +29,7 @@ public class DdayNotificationService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
+    private final DdayMessageTemplateRepository ddayMessageTemplateRepository;
 
     private static final int[] DDAYS = {1, 3, 7};
 
@@ -34,14 +37,15 @@ public class DdayNotificationService {
     @Transactional
     public void generateDailyDdays() {
         LocalDate today = LocalDate.now();
+        Map<Integer, DdayMessageTemplate> templateMap = loadTemplates();
         for (int dday : DDAYS) {
             LocalDate target = today.plusDays(dday);
-            generateForDate(target, dday);
+            generateForDate(target, dday, templateMap.get(dday));
         }
     }
 
     @Transactional
-    public void generateForDate(LocalDate targetDate, int dday) {
+    public void generateForDate(LocalDate targetDate, int dday, DdayMessageTemplate template) {
         LocalDateTime start = targetDate.atStartOfDay();
         LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
 
@@ -73,8 +77,15 @@ public class DdayNotificationService {
                     ? team.getColor().getHex()
                     : "";
 
-            String messageTitle = String.format("[D-%d] %s 마감이 %d일 남았습니다!", dday, s.getTitle(), dday);
-            String messageBody = "진행 상황을 팀원들과 공유해보세요.";
+            String messageTitle;
+            String messageBody;
+            if (template != null) {
+                messageTitle = renderTemplate(template.getTitleTemplate(), s, team, dday);
+                messageBody = renderTemplate(template.getBodyTemplate(), s, team, dday);
+            } else {
+                messageTitle = String.format("[D-%d] %s 마감이 %d일 남았습니다!", dday, s.getTitle(), dday);
+                messageBody = "진행 상황을 팀원들과 공유해보세요.";
+            }
 
             String eventKey = "DDAY:" + s.getId() + ":" + dday;
 
@@ -91,5 +102,31 @@ public class DdayNotificationService {
 
             notificationService.createNotificationWithReceipts(notification, targetUserIds);
         }
+    }
+
+    private Map<Integer, DdayMessageTemplate> loadTemplates() {
+        List<DdayMessageTemplate> list = ddayMessageTemplateRepository.findAll();
+        Map<Integer, DdayMessageTemplate> map = new HashMap<>();
+        for (DdayMessageTemplate t : list) {
+            map.put(t.getDday(), t);
+        }
+        if (map.isEmpty()) {
+            log.warn("[DDAY] no templates found in DB. fallback to default messages.");
+        }
+        return map;
+    }
+
+    private String renderTemplate(String template, TeamSchedule schedule, Team team, int dday) {
+        if (template == null) return "";
+        String title = (schedule.getTitle() != null && !schedule.getTitle().isBlank())
+                ? schedule.getTitle()
+                : "과제";
+        String teamName = (team.getName() != null && !team.getName().isBlank())
+                ? team.getName()
+                : "팀";
+        return template
+                .replace("{title}", title)
+                .replace("{team}", teamName)
+                .replace("{dday}", String.valueOf(dday));
     }
 }
