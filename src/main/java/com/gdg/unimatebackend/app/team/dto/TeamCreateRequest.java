@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 
+import java.time.LocalDate;
+
 @Getter
 public class TeamCreateRequest {
 
@@ -18,4 +20,10 @@ public class TeamCreateRequest {
 
     @NotNull
     private TeamColor color;
+
+    @NotNull
+    private LocalDate startAt;
+
+    @NotNull
+    private LocalDate endAt;
 }
