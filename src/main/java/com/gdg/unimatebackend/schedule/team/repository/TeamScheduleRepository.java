@@ -26,4 +26,6 @@ public interface TeamScheduleRepository extends JpaRepository<TeamSchedule, Long
             @Param("rangeStart") LocalDateTime rangeStart,
             @Param("rangeEnd") LocalDateTime rangeEnd
     );
+
+    List<TeamSchedule> findByStartAtBetween(LocalDateTime startAt, LocalDateTime endAt);
 }
