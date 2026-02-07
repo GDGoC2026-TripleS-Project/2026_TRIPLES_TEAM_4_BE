@@ -1,0 +1,14 @@
+package com.gdg.unimatebackend.schedulepoll.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SchedulePollFixRequest {
+    private Integer fixedSlotId;
+}
