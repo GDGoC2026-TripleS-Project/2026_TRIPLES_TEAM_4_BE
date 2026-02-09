@@ -1,24 +1,18 @@
 package com.gdg.unimatebackend.poke.event;
 
-import com.gdg.unimatebackend.alarm.dto.FcmSendDto;
-import com.gdg.unimatebackend.alarm.repository.FcmDeviceTokenRepository;
-import com.gdg.unimatebackend.alarm.service.FcmService;
 import com.gdg.unimatebackend.notification.entity.Notification;
 import com.gdg.unimatebackend.notification.service.NotificationService;
 import com.gdg.unimatebackend.team.entity.Team;
 import com.gdg.unimatebackend.team.repository.TeamRepository;
-import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import org.springframework.orm.jpa.JpaTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
 
 @Slf4j
@@ -26,27 +20,21 @@ import java.util.*;
 @RequiredArgsConstructor
 public class PokeAlarmEventListener {
 
-    private final FcmDeviceTokenRepository fcmDeviceTokenRepository;
-    private final FcmService fcmService;
-
     private final TeamRepository teamRepository;
     private final NotificationService notificationService;
     private final EntityManager em;
-    private final EntityManagerFactory entityManagerFactory;
+    private final ApplicationEventPublisher eventPublisher;
 
     @TransactionalEventListener(
-            phase = TransactionPhase.AFTER_COMMIT,
+            phase = TransactionPhase.BEFORE_COMMIT,
             fallbackExecution = true
     )
     public void handle(PokeSentEvent event) {
-        TransactionTemplate transactionTemplate =
-                new TransactionTemplate(new JpaTransactionManager(entityManagerFactory));
-        transactionTemplate.executeWithoutResult(status -> {
-            log.info("[POKE][NOTI] listener fired. senderId={}, messageId={}, targets={}",
-                    event.getSenderId(), event.getPokeMessageId(), event.getTargetUserIds());
-            // ✅ 캡쳐 문구 템플릿
-            PokeAlarmTypeMapper.PokeAlarmTemplate template =
-                    PokeAlarmTypeMapper.fromMessageId(event.getPokeMessageId());
+        log.info("[POKE][NOTI] listener fired. senderId={}, messageId={}, targets={}",
+                event.getSenderId(), event.getPokeMessageId(), event.getTargetUserIds());
+        // ✅ 캡쳐 문구 템플릿
+        PokeAlarmTypeMapper.PokeAlarmTemplate template =
+                PokeAlarmTypeMapper.fromMessageId(event.getPokeMessageId());
 
         String alarmType = template.getAlarmType();          // 섹션 헤더
         String messageTitle = template.getMessageTitle();    // 카드/푸시 메인
@@ -100,8 +88,8 @@ public class PokeAlarmEventListener {
         teamRepository.findAllById(byTeam.keySet())
                 .forEach(t -> teamMap.put(t.getId(), t));
 
-            // 팀 단위로 Notification 1개 + receipt N개 + FCM N개
-            for (Map.Entry<Long, List<PokeRow>> entry : byTeam.entrySet()) {
+        // 팀 단위로 Notification N개 + receipt N개 (FCM은 AFTER_COMMIT 이벤트로 분리)
+        for (Map.Entry<Long, List<PokeRow>> entry : byTeam.entrySet()) {
             Long teamId = entry.getKey();
             Team team = teamMap.get(teamId);
             if (team == null) {
@@ -120,7 +108,7 @@ public class PokeAlarmEventListener {
             String pushTitle = teamName;
             String pushBody = messageTitle; // 길면 여기만 보이는 게 보통이라 메인 문구를 body로
 
-                for (PokeRow row : entry.getValue()) {
+            for (PokeRow row : entry.getValue()) {
                 Long receiverId = row.targetUserId;
                 Long pokeId = row.pokeId;
 
@@ -142,48 +130,28 @@ public class PokeAlarmEventListener {
                         .pokeId(pokeId)
                         .build();
 
-                    Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+                Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
 
                 LocalDateTime createdAt = saved.getCreatedAt() != null ? saved.getCreatedAt() : now;
-                String createdAtText = createdAt.atOffset(ZoneOffset.ofHours(9)).toString();
 
-                    try {
-                    var opt = fcmDeviceTokenRepository
-                            .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(receiverId);
-
-                    if (opt.isEmpty()) {
-                        log.info("[POKE][FCM] no token. targetUserId={}", receiverId);
-                        continue;
-                    }
-
-                    Map<String, String> data = new HashMap<>();
-                    data.put("notificationId", String.valueOf(saved.getId()));
-                    data.put("eventKey", saved.getEventKey());
-                    data.put("type", "POKE");
-                    data.put("senderId", String.valueOf(event.getSenderId()));
-                    data.put("receiverId", String.valueOf(receiverId));
-                    data.put("pokeId", String.valueOf(pokeId));
-                    data.put("teamId", String.valueOf(teamId));
-                    data.put("teamName", teamName);
-                    data.put("teamColorHex", teamColorHex);
-                    data.put("alarmType", alarmType);
-                    data.put("messageTitle", messageTitle);
-                    data.put("messageBody", messageBody);
-                    data.put("createdAt", createdAtText);
-
-                    fcmService.sendMessageTo(FcmSendDto.builder()
-                            .token(opt.get().getToken())
-                            .title(pushTitle)    // ✅ 체리시
-                            .body(pushBody)      // ✅ 자료를 기다리고 있는 팀원이 있어요👀
-                            .data(data)
-                            .build());
-
-                    } catch (Exception e) {
-                        log.warn("[POKE][FCM] fail targetUserId={}, reason={}", receiverId, e.getMessage());
-                    }
-                }
+                eventPublisher.publishEvent(PokeFcmEvent.builder()
+                        .notificationId(saved.getId())
+                        .eventKey(saved.getEventKey())
+                        .senderId(event.getSenderId())
+                        .receiverId(receiverId)
+                        .pokeId(pokeId)
+                        .teamId(teamId)
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .alarmType(alarmType)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .pushTitle(pushTitle)
+                        .pushBody(pushBody)
+                        .createdAt(createdAt)
+                        .build());
             }
-        });
+        }
     }
 
     private String safeTeamName(String teamName) {
