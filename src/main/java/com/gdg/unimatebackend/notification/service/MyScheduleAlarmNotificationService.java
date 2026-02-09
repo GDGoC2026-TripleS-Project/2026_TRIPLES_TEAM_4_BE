@@ -74,11 +74,11 @@ public class MyScheduleAlarmNotificationService {
             Long receiverId = s.getUserId();
             if (receiverId == null) continue;
 
-            String eventKey = "MY_SCHEDULE_ALARM:" + s.getId() + ":" + receiverId + ":" + alarmMinutes + ":" + s.getEndAt();
+            String eventKey = "SCHEDULE_ALARM:MY:" + s.getId() + ":" + receiverId + ":" + alarmMinutes + ":" + s.getEndAt();
 
             Notification notification = Notification.builder()
                     .eventKey(eventKey)
-                    .type("MY_SCHEDULE_ALARM")
+                    .type("SCHEDULE_ALARM")
                     .alarmType("ALARM_MINUTES")
                     .teamId(s.getTeamId())
                     .teamName(teamName)

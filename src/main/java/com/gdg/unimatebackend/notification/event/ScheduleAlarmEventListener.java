@@ -48,6 +48,7 @@ public class ScheduleAlarmEventListener {
         data.put("teamName", event.getTeamName() != null ? event.getTeamName() : "");
         data.put("teamColorHex", event.getTeamColorHex() != null ? event.getTeamColorHex() : "");
         data.put("teamScheduleId", String.valueOf(event.getTeamScheduleId()));
+        data.put("alarmType", "ALARM_MINUTES");
         data.put("alarmMinutes", String.valueOf(event.getAlarmMinutes()));
         data.put("messageTitle", event.getMessageTitle());
         data.put("messageBody", event.getMessageBody());
