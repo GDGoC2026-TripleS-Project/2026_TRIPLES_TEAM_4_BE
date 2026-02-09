@@ -78,4 +78,6 @@ public interface MyScheduleRepository extends JpaRepository<MySchedule, Long> {
             @Param("rangeStart") LocalDateTime rangeStart,
             @Param("rangeEnd") LocalDateTime rangeEnd
     );
+
+    List<MySchedule> findByEndAtBetweenAndAlarmMinutesIsNotNull(LocalDateTime startAt, LocalDateTime endAt);
 }
