@@ -5,6 +5,8 @@ import com.gdg.unimatebackend.notification.event.ScheduleAlarmEvent;
 import com.gdg.unimatebackend.schedule.team.entity.TeamSchedule;
 import com.gdg.unimatebackend.schedule.team.repository.TeamScheduleRepository;
 import com.gdg.unimatebackend.team.entity.Team;
+import com.gdg.unimatebackend.team.entity.TeamMember;
+import com.gdg.unimatebackend.team.repository.TeamMemberRepository;
 import com.gdg.unimatebackend.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class ScheduleAlarmNotificationService {
 
     private final TeamScheduleRepository teamScheduleRepository;
     private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -40,7 +43,7 @@ public class ScheduleAlarmNotificationService {
         LocalDateTime rangeEnd = now.plusDays(1); // alarmMinutes max 1440
 
         List<TeamSchedule> schedules =
-                teamScheduleRepository.findByStartAtBetweenAndAlarmMinutesIsNotNull(now.minusMinutes(1), rangeEnd);
+                teamScheduleRepository.findByEndAtBetweenAndAlarmMinutesIsNotNull(now.minusMinutes(1), rangeEnd);
 
         if (schedules.isEmpty()) return;
 
@@ -54,7 +57,7 @@ public class ScheduleAlarmNotificationService {
             Integer alarmMinutes = s.getAlarmMinutes();
             if (alarmMinutes == null) continue;
 
-            long diffMinutes = ChronoUnit.MINUTES.between(now, s.getStartAt());
+            long diffMinutes = ChronoUnit.MINUTES.between(now, s.getEndAt());
             if (diffMinutes != alarmMinutes) continue;
 
             Team team = teamMap.get(s.getTeamId());
@@ -66,41 +69,46 @@ public class ScheduleAlarmNotificationService {
                     : "";
 
             String messageTitle = s.getTitle() != null ? s.getTitle() : "일정";
-            String messageBody = String.format("'%s' 일정 시작 %d분 전입니다.", messageTitle, alarmMinutes);
+            String messageBody = String.format("'%s' 일정 마감 %d분 전입니다.", messageTitle, alarmMinutes);
 
-            Long receiverId = s.getCreatedBy();
-            if (receiverId == null) continue;
+            List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(s.getTeamId());
+            if (members.isEmpty()) continue;
 
-            String eventKey = "SCHEDULE_ALARM:" + s.getId() + ":" + receiverId + ":" + alarmMinutes + ":" + s.getStartAt();
+            for (TeamMember m : members) {
+                Long receiverId = m.getUserId();
+                if (receiverId == null) continue;
 
-            Notification notification = Notification.builder()
-                    .eventKey(eventKey)
-                    .type("SCHEDULE_ALARM")
-                    .alarmType("ALARM_MINUTES")
-                    .teamId(s.getTeamId())
-                    .teamName(teamName)
-                    .teamColorHex(teamColorHex)
-                    .messageTitle(messageTitle)
-                    .messageBody(messageBody)
-                    .senderId(SYSTEM_SENDER_ID)
-                    .receiverId(receiverId)
-                    .teamScheduleId(s.getId())
-                    .build();
+                String eventKey = "SCHEDULE_ALARM:" + s.getId() + ":" + receiverId + ":" + alarmMinutes + ":" + s.getEndAt();
 
-            Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+                Notification notification = Notification.builder()
+                        .eventKey(eventKey)
+                        .type("SCHEDULE_ALARM")
+                        .alarmType("ALARM_MINUTES")
+                        .teamId(s.getTeamId())
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .senderId(SYSTEM_SENDER_ID)
+                        .receiverId(receiverId)
+                        .teamScheduleId(s.getId())
+                        .build();
 
-            eventPublisher.publishEvent(ScheduleAlarmEvent.builder()
-                    .notificationId(saved.getId())
-                    .receiverId(receiverId)
-                    .teamId(s.getTeamId())
-                    .teamName(teamName)
-                    .teamColorHex(teamColorHex)
-                    .teamScheduleId(s.getId())
-                    .alarmMinutes(alarmMinutes)
-                    .messageTitle(messageTitle)
-                    .messageBody(messageBody)
-                    .createdAt(saved.getCreatedAt())
-                    .build());
+                Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+
+                eventPublisher.publishEvent(ScheduleAlarmEvent.builder()
+                        .notificationId(saved.getId())
+                        .receiverId(receiverId)
+                        .teamId(s.getTeamId())
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .teamScheduleId(s.getId())
+                        .alarmMinutes(alarmMinutes)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .createdAt(saved.getCreatedAt())
+                        .build());
+            }
         }
     }
 }

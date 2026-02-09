@@ -32,4 +32,6 @@ public interface TeamScheduleRepository extends JpaRepository<TeamSchedule, Long
     List<TeamSchedule> findByEndAtBetween(LocalDateTime startAt, LocalDateTime endAt);
 
     List<TeamSchedule> findByStartAtBetweenAndAlarmMinutesIsNotNull(LocalDateTime startAt, LocalDateTime endAt);
+
+    List<TeamSchedule> findByEndAtBetweenAndAlarmMinutesIsNotNull(LocalDateTime startAt, LocalDateTime endAt);
 }
