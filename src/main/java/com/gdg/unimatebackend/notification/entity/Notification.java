@@ -14,7 +14,10 @@ import java.time.LocalDateTime;
 @Table(
         name = "notifications",
         indexes = {
-                @Index(name = "idx_notifications_team_created", columnList = "team_id,created_at")
+                @Index(name = "idx_notifications_team_created", columnList = "team_id,created_at"),
+                @Index(name = "idx_notifications_receiver_created", columnList = "receiver_id,created_at"),
+                @Index(name = "idx_notifications_schedule", columnList = "team_schedule_id"),
+                @Index(name = "idx_notifications_poke", columnList = "poke_id")
         },
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_notifications_event_key", columnNames = "event_key")
@@ -49,6 +52,18 @@ public class Notification {
 
     @Column(name = "message_body", nullable = false, length = 1000)
     private String messageBody;
+
+    @Column(name = "sender_id")
+    private Long senderId;
+
+    @Column(name = "receiver_id", nullable = false)
+    private Long receiverId;
+
+    @Column(name = "team_schedule_id")
+    private Long teamScheduleId;
+
+    @Column(name = "poke_id")
+    private Long pokeId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -14,9 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -110,56 +107,55 @@ public class PokeAlarmEventListener {
                     ? team.getColor().getHex()
                     : "";
 
-            List<Long> targetUserIds = entry.getValue().stream()
-                    .map(r -> r.targetUserId)
-                    .distinct()
-                    .toList();
-
-            List<Long> pokeIds = entry.getValue().stream()
-                    .map(r -> r.pokeId)
-                    .sorted()
-                    .toList();
-
-            // eventKey: 동일 이벤트 중복 방지용(서버 설계에 맞춰 유지)
-            String eventKeyRaw = "POKE:" + event.getSenderId() + ":" + event.getPokeMessageId()
-                    + ":" + teamId + ":" + joinIds(pokeIds);
-            String eventKey = sha256Hex(eventKeyRaw);
-
-            // ✅ DB 저장(카드 렌더 기준으로 저장)
-            Notification notification = Notification.builder()
-                    .eventKey(eventKey)
-                    .type("POKE")
-                    .alarmType(alarmType)
-                    .teamId(teamId)
-                    .teamName(teamName)
-                    .teamColorHex(teamColorHex)
-                    .messageTitle(messageTitle)
-                    .messageBody(messageBody)
-                    .build();
-
-            Notification saved = notificationService.createNotificationWithReceipts(notification, targetUserIds);
-
-            LocalDateTime createdAt = saved.getCreatedAt() != null ? saved.getCreatedAt() : now;
-            String createdAtText = createdAt.atOffset(ZoneOffset.ofHours(9)).toString();
-
             // ✅ 시스템 푸시에서 보이는 제목/본문 규칙
             // title: 팀명(체리시)
             // body : 메인 문구(자료를 기다리고...)
             String pushTitle = teamName;
             String pushBody = messageTitle; // 길면 여기만 보이는 게 보통이라 메인 문구를 body로
 
-            for (Long targetUserId : targetUserIds) {
+            for (PokeRow row : entry.getValue()) {
+                Long receiverId = row.targetUserId;
+                Long pokeId = row.pokeId;
+
+                // eventKey: receiver 단위로 고유
+                String eventKey = "POKE:" + pokeId + ":" + receiverId;
+
+                // ✅ DB 저장(수신자 단위)
+                Notification notification = Notification.builder()
+                        .eventKey(eventKey)
+                        .type("POKE")
+                        .alarmType(alarmType)
+                        .teamId(teamId)
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .senderId(event.getSenderId())
+                        .receiverId(receiverId)
+                        .pokeId(pokeId)
+                        .build();
+
+                Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+
+                LocalDateTime createdAt = saved.getCreatedAt() != null ? saved.getCreatedAt() : now;
+                String createdAtText = createdAt.atOffset(ZoneOffset.ofHours(9)).toString();
+
                 try {
                     var opt = fcmDeviceTokenRepository
-                            .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(targetUserId);
+                            .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(receiverId);
 
                     if (opt.isEmpty()) {
-                        log.info("[POKE][FCM] no token. targetUserId={}", targetUserId);
+                        log.info("[POKE][FCM] no token. targetUserId={}", receiverId);
                         continue;
                     }
 
                     Map<String, String> data = new HashMap<>();
                     data.put("notificationId", String.valueOf(saved.getId()));
+                    data.put("eventKey", saved.getEventKey());
+                    data.put("type", "POKE");
+                    data.put("senderId", String.valueOf(event.getSenderId()));
+                    data.put("receiverId", String.valueOf(receiverId));
+                    data.put("pokeId", String.valueOf(pokeId));
                     data.put("teamId", String.valueOf(teamId));
                     data.put("teamName", teamName);
                     data.put("teamColorHex", teamColorHex);
@@ -176,7 +172,7 @@ public class PokeAlarmEventListener {
                             .build());
 
                 } catch (Exception e) {
-                    log.warn("[POKE][FCM] fail targetUserId={}, reason={}", targetUserId, e.getMessage());
+                    log.warn("[POKE][FCM] fail targetUserId={}, reason={}", receiverId, e.getMessage());
                 }
             }
         }
@@ -185,32 +181,6 @@ public class PokeAlarmEventListener {
     private String safeTeamName(String teamName) {
         if (teamName == null || teamName.isBlank()) return "팀";
         return teamName;
-    }
-
-    private String joinIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < ids.size(); i++) {
-            if (i > 0) sb.append("-");
-            sb.append(ids.get(i));
-        }
-        return sb.toString();
-    }
-
-    private String sha256Hex(String raw) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(raw.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(hash.length * 2);
-            for (byte b : hash) {
-                String h = Integer.toHexString(0xff & b);
-                if (h.length() == 1) hex.append('0');
-                hex.append(h);
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
     }
 
     private static class PokeRow {

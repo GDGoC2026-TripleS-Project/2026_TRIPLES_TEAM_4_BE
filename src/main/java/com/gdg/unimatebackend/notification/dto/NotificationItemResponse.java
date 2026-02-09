@@ -17,6 +17,10 @@ public class NotificationItemResponse {
     private String messageTitle;
     private String messageBody;
     private LocalDateTime createdAt;
+    private Long senderId;
+    private Long receiverId;
+    private Long teamScheduleId;
+    private Long pokeId;
 
     private boolean isRead;
     private boolean action;
