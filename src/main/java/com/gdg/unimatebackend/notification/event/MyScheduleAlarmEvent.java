@@ -17,5 +17,7 @@ public class MyScheduleAlarmEvent {
     private final Integer alarmMinutes;
     private final String messageTitle;
     private final String messageBody;
+    private final String pushTitle;
+    private final String pushBody;
     private final LocalDateTime createdAt;
 }
