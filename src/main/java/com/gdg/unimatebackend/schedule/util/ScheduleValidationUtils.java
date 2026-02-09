@@ -2,13 +2,13 @@ package com.gdg.unimatebackend.schedule.util;
 
 import com.gdg.unimatebackend.schedule.entity.ScheduleCategory;
 
-import java.util.Set;
 import java.util.function.Function;
 
 public final class ScheduleValidationUtils {
     private ScheduleValidationUtils() {}
 
-    private static final Set<Integer> ALLOWED_ALARMS = Set.of(0, 10, 30, 60, 1440);
+    private static final int MIN_ALARM_MINUTES = 0;
+    private static final int MAX_ALARM_MINUTES = 1440;
 
     public static void validateCategoryRequired(
             ScheduleCategory category,
@@ -29,8 +29,9 @@ public final class ScheduleValidationUtils {
             Integer alarmMinutes,
             Function<String, RuntimeException> exceptionFactory
     ) {
-        if (alarmMinutes != null && !ALLOWED_ALARMS.contains(alarmMinutes)) {
-            throw exceptionFactory.apply("alarmMinutes 값이 올바르지 않습니다");
+        if (alarmMinutes != null
+                && (alarmMinutes < MIN_ALARM_MINUTES || alarmMinutes > MAX_ALARM_MINUTES)) {
+            throw exceptionFactory.apply("alarmMinutes 값이 올바르지 않습니다 (0~1440)");
         }
     }
 
