@@ -44,8 +44,7 @@ public class NotificationService {
 
     private Notification saveNotificationIdempotent(Notification notification) {
         try {
-            Notification saved = notificationRepository.save(notification);
-            notificationRepository.flush();
+            Notification saved = notificationRepository.saveAndFlush(notification);
             org.slf4j.LoggerFactory.getLogger(NotificationService.class)
                     .info("[NOTI] saved. id={}, eventKey={}", saved.getId(), saved.getEventKey());
             return saved;
