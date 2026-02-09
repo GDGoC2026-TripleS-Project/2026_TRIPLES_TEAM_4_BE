@@ -7,12 +7,14 @@ import com.gdg.unimatebackend.notification.entity.Notification;
 import com.gdg.unimatebackend.notification.service.NotificationService;
 import com.gdg.unimatebackend.team.entity.Team;
 import com.gdg.unimatebackend.team.repository.TeamRepository;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
@@ -30,13 +32,15 @@ public class PokeAlarmEventListener {
     private final TeamRepository teamRepository;
     private final NotificationService notificationService;
     private final EntityManager em;
-    private final TransactionTemplate transactionTemplate;
+    private final EntityManagerFactory entityManagerFactory;
 
     @TransactionalEventListener(
             phase = TransactionPhase.AFTER_COMMIT,
             fallbackExecution = true
     )
     public void handle(PokeSentEvent event) {
+        TransactionTemplate transactionTemplate =
+                new TransactionTemplate(new JpaTransactionManager(entityManagerFactory));
         transactionTemplate.executeWithoutResult(status -> {
             log.info("[POKE][NOTI] listener fired. senderId={}, messageId={}, targets={}",
                     event.getSenderId(), event.getPokeMessageId(), event.getTargetUserIds());
