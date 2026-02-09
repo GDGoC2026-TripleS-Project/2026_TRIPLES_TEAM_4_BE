@@ -3,6 +3,7 @@ package com.gdg.unimatebackend.notification.service;
 import com.gdg.unimatebackend.notification.entity.DdayMessageTemplate;
 import com.gdg.unimatebackend.notification.entity.Notification;
 import com.gdg.unimatebackend.notification.repository.DdayMessageTemplateRepository;
+import com.gdg.unimatebackend.notification.event.DdayNotificationEvent;
 import com.gdg.unimatebackend.schedule.team.entity.TeamSchedule;
 import com.gdg.unimatebackend.schedule.team.repository.TeamScheduleRepository;
 import com.gdg.unimatebackend.team.entity.Team;
@@ -11,13 +12,14 @@ import com.gdg.unimatebackend.team.repository.TeamMemberRepository;
 import com.gdg.unimatebackend.team.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Slf4j
@@ -30,26 +32,19 @@ public class DdayNotificationService {
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
     private final DdayMessageTemplateRepository ddayMessageTemplateRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    private static final int[] DDAYS = {1, 3, 7};
+    private static final Long SYSTEM_SENDER_ID = 0L;
 
     @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
     @Transactional
     public void generateDailyDdays() {
         LocalDate today = LocalDate.now();
         Map<Integer, DdayMessageTemplate> templateMap = loadTemplates();
-        for (int dday : DDAYS) {
-            LocalDate target = today.plusDays(dday);
-            generateForDate(target, dday, templateMap.get(dday));
-        }
-    }
+        LocalDateTime rangeStart = today.atStartOfDay();
+        LocalDateTime rangeEnd = today.plusDays(8).atStartOfDay(); // D-1/3/7 범위
 
-    @Transactional
-    public void generateForDate(LocalDate targetDate, int dday, DdayMessageTemplate template) {
-        LocalDateTime start = targetDate.atStartOfDay();
-        LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
-
-        List<TeamSchedule> schedules = teamScheduleRepository.findByStartAtBetween(start, end);
+        List<TeamSchedule> schedules = teamScheduleRepository.findByEndAtBetween(rangeStart, rangeEnd);
         if (schedules.isEmpty()) return;
 
         Set<Long> teamIds = new HashSet<>();
@@ -66,6 +61,12 @@ public class DdayNotificationService {
         }
 
         for (TeamSchedule s : schedules) {
+            long diff = ChronoUnit.DAYS.between(today, s.getEndAt().toLocalDate());
+            if (diff != 1 && diff != 3 && diff != 7) continue;
+
+            int dday = (int) diff;
+            DdayMessageTemplate template = templateMap.get(dday);
+
             Team team = teamMap.get(s.getTeamId());
             if (team == null) continue;
 
@@ -87,20 +88,38 @@ public class DdayNotificationService {
                 messageBody = "진행 상황을 팀원들과 공유해보세요.";
             }
 
-            String eventKey = "DDAY:" + s.getId() + ":" + dday;
+            for (Long receiverId : targetUserIds) {
+                String eventKey = "DDAY:" + s.getId() + ":" + receiverId + ":" + dday;
 
-            Notification notification = Notification.builder()
-                    .eventKey(eventKey)
-                    .type("DDAY")
-                    .alarmType("D-" + dday)
-                    .teamId(s.getTeamId())
-                    .teamName(teamName)
-                    .teamColorHex(teamColorHex)
-                    .messageTitle(messageTitle)
-                    .messageBody(messageBody)
-                    .build();
+                Notification notification = Notification.builder()
+                        .eventKey(eventKey)
+                        .type("DDAY")
+                        .alarmType("D-" + dday)
+                        .teamId(s.getTeamId())
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .senderId(SYSTEM_SENDER_ID)
+                        .receiverId(receiverId)
+                        .teamScheduleId(s.getId())
+                        .build();
 
-            notificationService.createNotificationWithReceipts(notification, targetUserIds);
+                Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+
+                eventPublisher.publishEvent(DdayNotificationEvent.builder()
+                        .notificationId(saved.getId())
+                        .receiverId(receiverId)
+                        .teamId(s.getTeamId())
+                        .teamName(teamName)
+                        .teamColorHex(teamColorHex)
+                        .teamScheduleId(s.getId())
+                        .dday(dday)
+                        .messageTitle(messageTitle)
+                        .messageBody(messageBody)
+                        .createdAt(saved.getCreatedAt())
+                        .build());
+            }
         }
     }
 

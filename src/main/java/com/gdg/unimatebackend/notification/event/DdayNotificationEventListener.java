@@ -1,0 +1,67 @@
+package com.gdg.unimatebackend.notification.event;
+
+import com.gdg.unimatebackend.alarm.dto.FcmSendDto;
+import com.gdg.unimatebackend.alarm.repository.FcmDeviceTokenRepository;
+import com.gdg.unimatebackend.alarm.service.FcmService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class DdayNotificationEventListener {
+
+    private final FcmDeviceTokenRepository fcmDeviceTokenRepository;
+    private final FcmService fcmService;
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onDdayNotification(DdayNotificationEvent event) {
+        Long receiverId = event.getReceiverId();
+        if (receiverId == null) return;
+
+        var tokenOpt = fcmDeviceTokenRepository
+                .findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(receiverId);
+
+        if (tokenOpt.isEmpty()) {
+            log.info("[DDAY][FCM] no token. receiverId={}", receiverId);
+            return;
+        }
+
+        LocalDateTime createdAt = event.getCreatedAt() != null
+                ? event.getCreatedAt()
+                : LocalDateTime.now();
+        String createdAtText = createdAt.atOffset(ZoneOffset.ofHours(9)).toString();
+
+        Map<String, String> data = new HashMap<>();
+        data.put("notificationId", String.valueOf(event.getNotificationId()));
+        data.put("type", "DDAY");
+        data.put("receiverId", String.valueOf(receiverId));
+        data.put("teamId", String.valueOf(event.getTeamId()));
+        data.put("teamName", event.getTeamName() != null ? event.getTeamName() : "");
+        data.put("teamColorHex", event.getTeamColorHex() != null ? event.getTeamColorHex() : "");
+        data.put("teamScheduleId", String.valueOf(event.getTeamScheduleId()));
+        data.put("dday", String.valueOf(event.getDday()));
+        data.put("messageTitle", event.getMessageTitle() != null ? event.getMessageTitle() : "");
+        data.put("messageBody", event.getMessageBody() != null ? event.getMessageBody() : "");
+        data.put("createdAt", createdAtText);
+
+        try {
+            fcmService.sendMessageTo(FcmSendDto.builder()
+                    .token(tokenOpt.get().getToken())
+                    .title(event.getTeamName() != null ? event.getTeamName() : "팀")
+                    .body(event.getMessageTitle())
+                    .data(data)
+                    .build());
+        } catch (Exception e) {
+            log.warn("[DDAY][FCM] fail receiverId={}, reason={}", receiverId, e.getMessage());
+        }
+    }
+}

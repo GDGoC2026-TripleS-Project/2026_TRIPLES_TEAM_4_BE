@@ -29,6 +29,19 @@ public class NotificationService {
         return saved;
     }
 
+    @Transactional
+    public Notification createNotificationWithReceipt(Notification notification, Long receiverId) {
+        if (notification == null) {
+            throw new IllegalArgumentException("notification is null");
+        }
+        if (receiverId == null) {
+            throw new IllegalArgumentException("receiverId is null");
+        }
+        Notification saved = saveNotificationIdempotent(notification);
+        createReceiptsIdempotent(saved, List.of(receiverId));
+        return saved;
+    }
+
     private Notification saveNotificationIdempotent(Notification notification) {
         try {
             Notification saved = notificationRepository.save(notification);
