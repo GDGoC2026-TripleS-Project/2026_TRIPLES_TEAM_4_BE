@@ -5,7 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(
-        name = "university",
+        name = "universities",
         indexes = {
                 @Index(name = "idx_university_name", columnList = "name")
         }
