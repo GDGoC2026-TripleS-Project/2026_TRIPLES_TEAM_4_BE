@@ -4,6 +4,7 @@ import com.gdg.unimatebackend.notification.dto.NotificationItemResponse;
 import com.gdg.unimatebackend.notification.entity.NotificationReceipt;
 import com.gdg.unimatebackend.notification.service.NotificationCompletionService;
 import com.gdg.unimatebackend.notification.service.NotificationQueryService;
+import com.gdg.unimatebackend.notification.service.DdayNotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,6 +27,7 @@ public class NotificationController {
 
     private final NotificationCompletionService notificationCompletionService;
     private final NotificationQueryService notificationQueryService;
+    private final DdayNotificationService ddayNotificationService;
 
     @Operation(
             summary = "알림 완료 처리",
@@ -65,6 +67,17 @@ public class NotificationController {
     public ResponseEntity<java.util.List<NotificationItemResponse>> list(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(notificationQueryService.getMyNotifications(userId));
+    }
+
+    @Operation(
+            summary = "DDAY 테스트 실행(임시)",
+            description = "DDAY 스케줄러 로직을 즉시 실행합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @PostMapping("/dday-test/run")
+    public ResponseEntity<java.util.Map<String, String>> runDdayTest(Authentication authentication) {
+        ddayNotificationService.generateDailyDdays();
+        return ResponseEntity.ok(java.util.Map.of("status", "ok"));
     }
 
     @Operation(
