@@ -68,8 +68,11 @@ public class ScheduleAlarmNotificationService {
                     ? team.getColor().getHex()
                     : "";
 
-            String messageTitle = s.getTitle() != null ? s.getTitle() : "일정";
-            String messageBody = String.format("'%s' 일정 마감 %d분 전입니다.", messageTitle, alarmMinutes);
+            String rawTitle = s.getTitle() != null ? s.getTitle() : "일정";
+            String messageTitle = String.format("%s 마감 시간이 %d분 남았습니다!", rawTitle, alarmMinutes);
+            String messageBody = "";
+            String pushTitle = rawTitle;
+            String pushBody = String.format("'%s' 일정 마감 %d분 전입니다.", rawTitle, alarmMinutes);
 
             List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(s.getTeamId());
             if (members.isEmpty()) continue;
@@ -106,6 +109,8 @@ public class ScheduleAlarmNotificationService {
                         .alarmMinutes(alarmMinutes)
                         .messageTitle(messageTitle)
                         .messageBody(messageBody)
+                        .pushTitle(pushTitle)
+                        .pushBody(pushBody)
                         .createdAt(saved.getCreatedAt())
                         .build());
             }

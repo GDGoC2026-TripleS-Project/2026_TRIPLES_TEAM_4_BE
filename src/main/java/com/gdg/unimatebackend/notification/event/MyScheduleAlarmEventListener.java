@@ -54,10 +54,15 @@ public class MyScheduleAlarmEventListener {
         data.put("createdAt", createdAtText);
 
         try {
+            String pushTitle = event.getPushTitle() != null ? event.getPushTitle() : event.getMessageTitle();
+            String pushBody = event.getPushBody() != null ? event.getPushBody() : event.getMessageBody();
+            if (pushBody == null || pushBody.isBlank()) {
+                pushBody = event.getMessageTitle();
+            }
             fcmService.sendMessageTo(FcmSendDto.builder()
                     .token(tokenOpt.get().getToken())
-                    .title(event.getTeamName() != null ? event.getTeamName() : "팀")
-                    .body(event.getMessageTitle())
+                    .title(pushTitle)
+                    .body(pushBody)
                     .data(data)
                     .build());
         } catch (Exception e) {
