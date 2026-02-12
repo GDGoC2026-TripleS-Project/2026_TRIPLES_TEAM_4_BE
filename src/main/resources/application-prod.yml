@@ -38,12 +38,12 @@ oauth:
   kakao:
     client-id: ${KAKAO_CLIENT_ID}
     client-secret: ${KAKAO_CLIENT_SECRET}
-    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/kakao/callback
+    redirect-uri: http://unimate-alb-274308250.ap-northeast-2.elb.amazonaws.com/api/auth/kakao/callback
 
   naver:
     client-id: ${NAVER_CLIENT_ID}
     client-secret: ${NAVER_CLIENT_SECRET}
-    redirect-uri: https://seok-hwan1.duckdns.org/api/auth/naver/callback
+    redirect-uri: http://unimate-alb-274308250.ap-northeast-2.elb.amazonaws.com/api/auth/naver/callback
 
 fcm:
   project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
