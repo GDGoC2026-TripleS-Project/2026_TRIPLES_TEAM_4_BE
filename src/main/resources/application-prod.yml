@@ -32,7 +32,7 @@ springdoc:
 
 app:
   swagger:
-    prod-url: https://seok-hwan1.duckdns.org
+    prod-url: http://unimate-alb-274308250.ap-northeast-2.elb.amazonaws.com
 
 oauth:
   kakao:
@@ -69,5 +69,4 @@ aws:
     region: ${AWS_S3_REGION:ap-northeast-2}
     bucket-name: ${AWS_S3_BUCKET:seok-hwan-bucket}
     base-url: ${AWS_S3_BASE_URL:https://seok-hwan-bucket.s3.ap-northeast-2.amazonaws.com}
-
 
