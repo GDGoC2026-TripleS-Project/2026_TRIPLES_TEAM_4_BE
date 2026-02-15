@@ -282,9 +282,10 @@ public class TeamService {
                             .build()
             );
 
-            // 신규가입 때만(커밋 이후) 다른 팀원들에게 알림
-            eventPublisher.publishEvent(new TeamJoinedEvent(teamId, userId));
         }
+
+        // join 요청이 들어오면(신규/기존 멤버 모두) 알림 이벤트 발행
+        eventPublisher.publishEvent(new TeamJoinedEvent(teamId, userId));
 
         List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(teamId);
         List<TeamMemberResponse> memberResponses = buildMemberResponses(members);

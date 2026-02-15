@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -44,6 +45,7 @@ public class TeamMemberFcmNotifier {
     public void onTeamJoined(TeamJoinedEvent event) {
         Long teamId = event.getTeamId();
         Long joinedUserId = event.getJoinedUserId();
+        String joinTraceId = UUID.randomUUID().toString();
 
         String joinedNickname = userRepository.findById(joinedUserId)
                 .map(u -> (u.getNickname() == null || u.getNickname().isBlank()) ? "새 팀원" : u.getNickname())
@@ -65,7 +67,7 @@ public class TeamMemberFcmNotifier {
 
         for (Long receiverId : receiverUserIds) {
             Notification notification = Notification.builder()
-                    .eventKey("TEAM_JOINED:" + teamId + ":" + joinedUserId + ":" + receiverId)
+                    .eventKey("TEAM_JOINED:" + teamId + ":" + joinedUserId + ":" + receiverId + ":" + joinTraceId)
                     .type("TEAM_MEMBER_JOINED")
                     .alarmType("팀플 참여 알림")
                     .teamId(teamId)
@@ -98,7 +100,7 @@ public class TeamMemberFcmNotifier {
         }
 
         Notification joinedUserNotification = Notification.builder()
-                .eventKey("TEAM_JOINED_SELF:" + teamId + ":" + joinedUserId)
+                .eventKey("TEAM_JOINED_SELF:" + teamId + ":" + joinedUserId + ":" + joinTraceId)
                 .type("TEAM_JOINED")
                 .alarmType("팀플 참여 알림")
                 .teamId(teamId)

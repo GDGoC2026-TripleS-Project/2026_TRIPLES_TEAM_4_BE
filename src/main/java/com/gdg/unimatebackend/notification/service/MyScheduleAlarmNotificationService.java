@@ -54,8 +54,7 @@ public class MyScheduleAlarmNotificationService {
             Integer alarmMinutes = s.getAlarmMinutes();
             if (alarmMinutes == null) continue;
 
-            long diffMinutes = ChronoUnit.MINUTES.between(now, s.getEndAt());
-            if (diffMinutes != alarmMinutes) continue;
+            if (!shouldTriggerNow(now, s.getEndAt(), alarmMinutes)) continue;
 
             Team team = teamMap.get(s.getTeamId());
             if (team == null) continue;
@@ -106,5 +105,12 @@ public class MyScheduleAlarmNotificationService {
                     .createdAt(saved.getCreatedAt())
                     .build());
         }
+    }
+
+    private boolean shouldTriggerNow(LocalDateTime now, LocalDateTime endAt, int alarmMinutes) {
+        long diffSeconds = ChronoUnit.SECONDS.between(now, endAt);
+        long upper = alarmMinutes * 60L;
+        long lower = upper - 60L;
+        return diffSeconds <= upper && diffSeconds > lower;
     }
 }
