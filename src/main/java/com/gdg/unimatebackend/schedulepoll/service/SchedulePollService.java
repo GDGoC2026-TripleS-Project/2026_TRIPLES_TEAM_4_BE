@@ -20,11 +20,13 @@ import com.gdg.unimatebackend.team.repository.TeamMemberRepository;
 import com.gdg.unimatebackend.team.repository.TeamRepository;
 import com.gdg.unimatebackend.team.service.TeamService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class SchedulePollService {
@@ -166,7 +168,10 @@ public class SchedulePollService {
 
     private void createMeetingNotifications(Long creatorUserId, SchedulePoll poll) {
         Team team = teamRepository.findById(poll.getTeamId()).orElse(null);
-        if (team == null) return;
+        if (team == null) {
+            log.warn("[SCHEDULE_POLL_NOTI] skip: team not found. pollId={}, teamId={}", poll.getId(), poll.getTeamId());
+            return;
+        }
 
         String teamName = team.getName() != null ? team.getName() : "팀";
         String teamColorHex = (team.getColor() != null && team.getColor().getHex() != null)
@@ -174,6 +179,8 @@ public class SchedulePollService {
                 : "#CCCCCC";
 
         List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(poll.getTeamId());
+        log.info("[SCHEDULE_POLL_NOTI] start. pollId={}, teamId={}, creatorUserId={}, memberCount={}",
+                poll.getId(), poll.getTeamId(), creatorUserId, members.size());
         for (TeamMember member : members) {
             Long receiverId = member.getUserId();
             if (receiverId == null) continue;
@@ -198,7 +205,9 @@ public class SchedulePollService {
                     .receiverId(receiverId)
                     .build();
 
-            notificationService.createNotificationWithReceipt(notification, receiverId);
+            Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
+            log.info("[SCHEDULE_POLL_NOTI] created. pollId={}, notificationId={}, receiverId={}, type={}",
+                    poll.getId(), saved.getId(), receiverId, type);
         }
     }
 }
