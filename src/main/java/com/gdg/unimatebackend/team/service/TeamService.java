@@ -1,5 +1,6 @@
 package com.gdg.unimatebackend.team.service;
 
+import com.gdg.unimatebackend.notification.service.TeamEndNotificationService;
 import com.gdg.unimatebackend.team.dto.*;
 import com.gdg.unimatebackend.team.entity.*;
 import com.gdg.unimatebackend.team.event.TeamJoinedEvent;
@@ -30,6 +31,7 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final TeamEndNotificationService teamEndNotificationService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -152,6 +154,7 @@ public class TeamService {
             validateTeamPeriod(newStart, newEnd);
         }
         team.update(request.getName(), request.getDescription(), request.getStartAt(), request.getEndAt());
+        teamEndNotificationService.notifyIfEnded(team, userId);
         return toTeamResponse(team);
     }
 

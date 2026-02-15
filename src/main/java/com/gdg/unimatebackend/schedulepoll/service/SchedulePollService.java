@@ -1,5 +1,7 @@
 package com.gdg.unimatebackend.schedulepoll.service;
 
+import com.gdg.unimatebackend.notification.entity.Notification;
+import com.gdg.unimatebackend.notification.service.NotificationService;
 import com.gdg.unimatebackend.schedulepoll.dto.SchedulePollCreateRequest;
 import com.gdg.unimatebackend.schedulepoll.dto.SchedulePollCreateResponse;
 import com.gdg.unimatebackend.schedulepoll.dto.SchedulePollFixRequest;
@@ -12,6 +14,10 @@ import com.gdg.unimatebackend.schedulepoll.exception.SchedulePollErrorCodes;
 import com.gdg.unimatebackend.schedulepoll.exception.SchedulePollException;
 import com.gdg.unimatebackend.schedulepoll.repository.SchedulePollRepository;
 import com.gdg.unimatebackend.schedulepoll.repository.SchedulePollVoteRepository;
+import com.gdg.unimatebackend.team.entity.Team;
+import com.gdg.unimatebackend.team.entity.TeamMember;
+import com.gdg.unimatebackend.team.repository.TeamMemberRepository;
+import com.gdg.unimatebackend.team.repository.TeamRepository;
 import com.gdg.unimatebackend.team.service.TeamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +35,9 @@ public class SchedulePollService {
 
     // ✅ 추가: 팀 존재/멤버 검증 재사용
     private final TeamService teamService;
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public SchedulePollCreateResponse create(Long userId, SchedulePollCreateRequest req) {
@@ -58,6 +67,7 @@ public class SchedulePollService {
         }
 
         SchedulePoll saved = schedulePollRepository.save(poll);
+        createMeetingNotifications(userId, saved);
 
         return SchedulePollCreateResponse.builder()
                 .pollId(saved.getId())
@@ -151,6 +161,44 @@ public class SchedulePollService {
 
         for (Integer s : slots) {
             if (s == null || s < 0) throw new SchedulePollException(SchedulePollErrorCodes.INVALID_SLOTS);
+        }
+    }
+
+    private void createMeetingNotifications(Long creatorUserId, SchedulePoll poll) {
+        Team team = teamRepository.findById(poll.getTeamId()).orElse(null);
+        if (team == null) return;
+
+        String teamName = team.getName() != null ? team.getName() : "팀";
+        String teamColorHex = (team.getColor() != null && team.getColor().getHex() != null)
+                ? team.getColor().getHex()
+                : "#CCCCCC";
+
+        List<TeamMember> members = teamMemberRepository.findAllByTeamIdOrderByJoinedAtAsc(poll.getTeamId());
+        for (TeamMember member : members) {
+            Long receiverId = member.getUserId();
+            if (receiverId == null) continue;
+
+            boolean isCreator = receiverId.equals(creatorUserId);
+            String type = isCreator ? "MEETING_CREATED" : "MEETING_REQUEST";
+            String title = isCreator ? "모임이 생성되었어요!" : "모임 시간 체크요청이 들어왔어요!";
+            String body = isCreator
+                    ? "체크된 일정을 확인해주세요!"
+                    : "해당 팀스페이스로 이동해 모임 시간을 체크해주세요!";
+
+            Notification notification = Notification.builder()
+                    .eventKey("SCHEDULE_POLL_CREATE:" + poll.getId() + ":" + receiverId)
+                    .type(type)
+                    .alarmType("모임시간 체크요청")
+                    .teamId(team.getId())
+                    .teamName(teamName)
+                    .teamColorHex(teamColorHex)
+                    .messageTitle(title)
+                    .messageBody(body)
+                    .senderId(creatorUserId)
+                    .receiverId(receiverId)
+                    .build();
+
+            notificationService.createNotificationWithReceipt(notification, receiverId);
         }
     }
 }
