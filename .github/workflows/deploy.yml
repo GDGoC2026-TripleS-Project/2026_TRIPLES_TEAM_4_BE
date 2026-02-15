@@ -84,9 +84,16 @@ jobs:
 
             docker rm -f "${{ env.CONTAINER_NAME }}" || true
 
+            # FCM 서비스 계정 키 파일 준비
+            install -m 600 /dev/null /home/ubuntu/firebase-key.json
+            cat > /home/ubuntu/firebase-key.json <<'EOF'
+            ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+            EOF
+
             docker run -d --name "${{ env.CONTAINER_NAME }}" \
               --restart unless-stopped \
               -p 8080:8080 \
+              -v /home/ubuntu/firebase-key.json:/app/firebase-key.json:ro \
               -e TZ=Asia/Seoul \
               -e SPRING_PROFILES_ACTIVE='${{ secrets.SPRING_PROFILES_ACTIVE }}' \
               -e SPRING_DATASOURCE_URL="jdbc:mysql://${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_NAME }}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false" \
@@ -104,6 +111,8 @@ jobs:
               -e KAKAO_CLIENT_SECRET='${{ secrets.KAKAO_CLIENT_SECRET }}' \
               -e NAVER_CLIENT_ID='${{ secrets.NAVER_CLIENT_ID }}' \
               -e NAVER_CLIENT_SECRET='${{ secrets.NAVER_CLIENT_SECRET }}' \
+              -e FCM_PROJECT_ID='${{ secrets.FCM_PROJECT_ID }}' \
+              -e FCM_KEY_PATH='file:/app/firebase-key.json' \
               -e SPRINGDOC_API_DOCS_ENABLED=true \
               -e SPRINGDOC_SWAGGER_UI_ENABLED=true \
               "${IMAGE}"
