@@ -8,7 +8,7 @@ env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: test
   CONTAINER_NAME: unimate-app
-  HEALTH_URL: http://localhost:8080/api/system/health
+  HEALTH_URL: http://localhost:8080/actuator/health
 
 jobs:
   build:
@@ -51,7 +51,8 @@ jobs:
       - name: Deploy (docker pull & run)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 54.180.31.79
+          host: 52.78.19.179,13.209.74.139
+          sync: true
           username: ubuntu
           port: 22
           key: ${{ secrets.EC2_SSH_KEY }}
@@ -115,6 +116,8 @@ jobs:
               echo "waiting... ($i)"
               sleep 2
             done
+
+            curl -sf "${{ env.HEALTH_URL }}" > /dev/null
 
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
