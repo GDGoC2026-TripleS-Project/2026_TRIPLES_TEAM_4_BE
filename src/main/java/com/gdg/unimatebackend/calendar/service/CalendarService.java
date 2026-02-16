@@ -77,20 +77,6 @@ public class CalendarService {
             }
         }
 
-        // 3) 팀원 개인 일정 카운트 ✅ teamIds 필터 포함
-        Set<Long> memberUserIds = calendarTeamPort.getTeamMemberUserIds(userId, teamIds);
-        memberUserIds.remove(userId);
-
-        if (!memberUserIds.isEmpty()) {
-            List<MySchedule> memberSchedules =
-                    personalScheduleRepository.findAllOverlappingByUserIdsAndTeamIds(memberUserIds, teamIds, from, to);
-
-            for (MySchedule s : memberSchedules) {
-                // 비공개여도 블록 1개로 카운트 포함
-                addCountsByOverlap(countMap, s.getStartAt(), s.getEndAt(), first, last);
-            }
-        }
-
         List<CalendarDayCountResponse> dayCounts = countMap.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> CalendarDayCountResponse.builder()
@@ -176,32 +162,6 @@ public class CalendarService {
                             .isMasked(false)
                             .build());
                 }
-            }
-        }
-
-        // 2-2) 타인 개인 일정(DB) ✅ teamIds 필터 포함
-        Set<Long> memberUserIds = calendarTeamPort.getTeamMemberUserIds(userId, teamIds);
-        memberUserIds.remove(userId);
-
-        if (!memberUserIds.isEmpty()) {
-            LocalDateTime startOfDay = date.atStartOfDay();
-            LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
-
-            List<MySchedule> memberSchedules =
-                    personalScheduleRepository.findAllOverlappingByUserIdsAndTeamIds(memberUserIds, teamIds, startOfDay, endOfDay);
-
-            for (MySchedule s : memberSchedules) {
-                boolean masked = s.isPrivate();
-
-                personalItems.add(CalendarItemResponse.builder()
-                        .scheduleId(s.getId())
-                        .type("PERSONAL")
-                        .title(masked ? null : s.getTitle())
-                        .startAt(toStringSafe(s.getStartAt()))
-                        .endAt(toStringSafe(s.getEndAt()))
-                        .isCompleted(null)
-                        .isMasked(masked)
-                        .build());
             }
         }
 
