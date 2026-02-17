@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -149,8 +148,8 @@ public class TeamService {
 
         // 정책: color 변경 불가 (name/description만)
         if (request.getStartAt() != null || request.getEndAt() != null) {
-            LocalDate newStart = (request.getStartAt() != null) ? request.getStartAt() : team.getStartAt();
-            LocalDate newEnd = (request.getEndAt() != null) ? request.getEndAt() : team.getEndAt();
+            LocalDateTime newStart = (request.getStartAt() != null) ? request.getStartAt() : team.getStartAt();
+            LocalDateTime newEnd = (request.getEndAt() != null) ? request.getEndAt() : team.getEndAt();
             validateTeamPeriod(newStart, newEnd);
         }
         team.update(request.getName(), request.getDescription(), request.getStartAt(), request.getEndAt());
@@ -395,7 +394,7 @@ public class TeamService {
                 .build();
     }
 
-    private void validateTeamPeriod(LocalDate startAt, LocalDate endAt) {
+    private void validateTeamPeriod(LocalDateTime startAt, LocalDateTime endAt) {
         if (startAt == null || endAt == null) {
             throw new TeamException(TeamErrorCodes.FORBIDDEN, "startAt/endAt은 필수입니다", 400);
         }
@@ -404,8 +403,8 @@ public class TeamService {
         }
     }
 
-    private boolean isCompleted(LocalDate endAt) {
-        return endAt != null && endAt.isBefore(LocalDate.now());
+    private boolean isCompleted(LocalDateTime endAt) {
+        return endAt != null && endAt.isBefore(LocalDateTime.now());
     }
 
     @Transactional(readOnly = true)

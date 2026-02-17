@@ -3,7 +3,7 @@ package com.gdg.unimatebackend.team.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 public class TeamUpdateRequest {
@@ -14,6 +14,6 @@ public class TeamUpdateRequest {
     @Size(max = 300)
     private String description;
 
-    private LocalDate startAt;
-    private LocalDate endAt;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
 }

@@ -5,7 +5,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,10 +35,10 @@ public class Team {
     private TeamColor color;
 
     @Column(name = "start_at", nullable = false)
-    private LocalDate startAt;
+    private LocalDateTime startAt;
 
     @Column(name = "end_at", nullable = false)
-    private LocalDate endAt;
+    private LocalDateTime endAt;
 
     @Column(name = "owner_user_id")
     private Long ownerUserId;
@@ -68,7 +67,7 @@ public class Team {
         this.inviteCodeExpiresAt = null;
     }
 
-    public void update(String name, String description, LocalDate startAt, LocalDate endAt) {
+    public void update(String name, String description, LocalDateTime startAt, LocalDateTime endAt) {
         if (name != null && !name.isBlank()) this.name = name;
         if (description != null) this.description = description;
         if (startAt != null) this.startAt = startAt;

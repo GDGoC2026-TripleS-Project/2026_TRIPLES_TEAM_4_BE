@@ -4,7 +4,7 @@ import com.gdg.unimatebackend.team.entity.Team;
 import com.gdg.unimatebackend.team.entity.TeamColor;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,5 +16,5 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     boolean existsByColor(TeamColor color);
 
-    List<Team> findByEndAtLessThanEqual(LocalDate date);
+    List<Team> findByEndAtLessThanEqual(LocalDateTime dateTime);
 }

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -19,8 +18,8 @@ public class TeamSummaryResponse {
     private String colorHex;
     private TeamRole myRole;
     private long memberCount;
-    private LocalDate startAt;
-    private LocalDate endAt;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
     @JsonProperty("isCompleted")
     private boolean isCompleted;
     private LocalDateTime createdAt;

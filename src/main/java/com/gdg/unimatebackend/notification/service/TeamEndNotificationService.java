@@ -10,7 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -27,16 +27,16 @@ public class TeamEndNotificationService {
     @Transactional
     public void notifyIfEnded(Team team, Long senderUserId) {
         if (team == null || team.getId() == null || team.getEndAt() == null) return;
-        LocalDate today = LocalDate.now(KST);
-        if (team.getEndAt().isAfter(today)) return;
+        LocalDateTime now = LocalDateTime.now(KST);
+        if (team.getEndAt().isAfter(now)) return;
         createTeamEndNotifications(team, senderUserId);
     }
 
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Seoul")
     @Transactional
     public void generateForEndedTeams() {
-        LocalDate today = LocalDate.now(KST);
-        List<Team> teams = teamRepository.findByEndAtLessThanEqual(today);
+        LocalDateTime now = LocalDateTime.now(KST);
+        List<Team> teams = teamRepository.findByEndAtLessThanEqual(now);
         for (Team team : teams) {
             createTeamEndNotifications(team, 0L);
         }

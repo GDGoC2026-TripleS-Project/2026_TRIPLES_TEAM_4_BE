@@ -7,6 +7,7 @@ import com.gdg.unimatebackend.user.entity.User;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 @Component
@@ -36,12 +37,12 @@ public class MyPageAssembler {
                 .build();
     }
 
-    private String calcDDay(LocalDate endAt, boolean isCompleted) {
+    private String calcDDay(LocalDateTime endAt, boolean isCompleted) {
         if (endAt == null || isCompleted) {
             return null;
         }
 
-        long diff = ChronoUnit.DAYS.between(LocalDate.now(), endAt);
+        long diff = ChronoUnit.DAYS.between(LocalDate.now(), endAt.toLocalDate());
 
         if (diff >= 0) {
             return "D-" + diff;

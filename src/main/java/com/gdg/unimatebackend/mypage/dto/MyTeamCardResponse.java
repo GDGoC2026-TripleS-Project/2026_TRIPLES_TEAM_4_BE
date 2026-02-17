@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Builder
@@ -17,8 +17,8 @@ public class MyTeamCardResponse {
 
     private Long memberCount;
 
-    private LocalDate startAt;
-    private LocalDate endAt;
+    private LocalDateTime startAt;
+    private LocalDateTime endAt;
 
     private Boolean isCompleted;
 
