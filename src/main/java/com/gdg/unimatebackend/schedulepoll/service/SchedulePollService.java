@@ -1,5 +1,8 @@
 package com.gdg.unimatebackend.schedulepoll.service;
 
+import com.gdg.unimatebackend.alarm.dto.FcmSendDto;
+import com.gdg.unimatebackend.alarm.repository.FcmDeviceTokenRepository;
+import com.gdg.unimatebackend.alarm.service.FcmService;
 import com.gdg.unimatebackend.notification.entity.Notification;
 import com.gdg.unimatebackend.notification.service.NotificationService;
 import com.gdg.unimatebackend.schedulepoll.dto.SchedulePollCreateRequest;
@@ -24,7 +27,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -40,6 +47,8 @@ public class SchedulePollService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NotificationService notificationService;
+    private final FcmDeviceTokenRepository fcmDeviceTokenRepository;
+    private final FcmService fcmService;
 
     @Transactional
     public SchedulePollCreateResponse create(Long userId, SchedulePollCreateRequest req) {
@@ -208,6 +217,47 @@ public class SchedulePollService {
             Notification saved = notificationService.createNotificationWithReceipt(notification, receiverId);
             log.info("[SCHEDULE_POLL_NOTI] created. pollId={}, notificationId={}, receiverId={}, type={}",
                     poll.getId(), saved.getId(), receiverId, type);
+
+            sendMeetingFcm(saved, receiverId, type);
+        }
+    }
+
+    private void sendMeetingFcm(Notification notification, Long receiverId, String type) {
+        var tokenOpt = fcmDeviceTokenRepository.findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(receiverId);
+        if (tokenOpt.isEmpty()) {
+            log.info("[SCHEDULE_POLL_NOTI] no token. receiverId={}, notificationId={}", receiverId, notification.getId());
+            return;
+        }
+
+        LocalDateTime createdAt = notification.getCreatedAt() != null
+                ? notification.getCreatedAt()
+                : LocalDateTime.now();
+        String createdAtText = createdAt.atOffset(ZoneOffset.ofHours(9)).toString();
+
+        Map<String, String> data = new HashMap<>();
+        data.put("notificationId", String.valueOf(notification.getId()));
+        data.put("type", type != null ? type : "");
+        data.put("receiverId", String.valueOf(receiverId));
+        data.put("teamId", String.valueOf(notification.getTeamId()));
+        data.put("teamName", notification.getTeamName() != null ? notification.getTeamName() : "");
+        data.put("teamColorHex", notification.getTeamColorHex() != null ? notification.getTeamColorHex() : "#CCCCCC");
+        data.put("alarmType", notification.getAlarmType() != null ? notification.getAlarmType() : "알림");
+        data.put("messageTitle", notification.getMessageTitle() != null ? notification.getMessageTitle() : "");
+        data.put("messageBody", notification.getMessageBody() != null ? notification.getMessageBody() : "");
+        data.put("createdAt", createdAtText);
+
+        try {
+            String pushTitle = notification.getTeamName() != null ? notification.getTeamName() : "팀";
+            String pushBody = notification.getMessageTitle() != null ? notification.getMessageTitle() : "모임 알림이 도착했어요.";
+            fcmService.sendMessageTo(FcmSendDto.builder()
+                    .token(tokenOpt.get().getToken())
+                    .title(pushTitle)
+                    .body(pushBody)
+                    .data(data)
+                    .build());
+        } catch (Exception e) {
+            log.warn("[SCHEDULE_POLL_NOTI] fcm fail. receiverId={}, notificationId={}, reason={}",
+                    receiverId, notification.getId(), e.getMessage());
         }
     }
 }
