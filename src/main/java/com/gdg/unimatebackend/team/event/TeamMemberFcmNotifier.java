@@ -45,7 +45,7 @@ public class TeamMemberFcmNotifier {
     public void onTeamJoined(TeamJoinedEvent event) {
         Long teamId = event.getTeamId();
         Long joinedUserId = event.getJoinedUserId();
-        String joinTraceId = UUID.randomUUID().toString();
+        String joinTraceId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
         String joinedNickname = userRepository.findById(joinedUserId)
                 .map(u -> (u.getNickname() == null || u.getNickname().isBlank()) ? "새 팀원" : u.getNickname())
@@ -67,7 +67,7 @@ public class TeamMemberFcmNotifier {
 
         for (Long receiverId : receiverUserIds) {
             Notification notification = Notification.builder()
-                    .eventKey("TEAM_JOINED:" + teamId + ":" + joinedUserId + ":" + receiverId + ":" + joinTraceId)
+                    .eventKey(buildJoinEventKey(teamId, joinedUserId, receiverId, joinTraceId))
                     .type("TEAM_MEMBER_JOINED")
                     .alarmType("팀플 참여 알림")
                     .teamId(teamId)
@@ -100,7 +100,7 @@ public class TeamMemberFcmNotifier {
         }
 
         Notification joinedUserNotification = Notification.builder()
-                .eventKey("TEAM_JOINED_SELF:" + teamId + ":" + joinedUserId + ":" + joinTraceId)
+                .eventKey(buildJoinSelfEventKey(teamId, joinedUserId, joinTraceId))
                 .type("TEAM_JOINED")
                 .alarmType("팀플 참여 알림")
                 .teamId(teamId)
@@ -209,5 +209,25 @@ public class TeamMemberFcmNotifier {
         data.put("messageBody", notification.getMessageBody() != null ? notification.getMessageBody() : "");
         data.put("createdAt", createdAtText);
         return data;
+    }
+
+    private String buildJoinEventKey(Long teamId, Long joinedUserId, Long receiverId, String trace) {
+        return "TJ:"
+                + toBase36(teamId) + ":"
+                + toBase36(joinedUserId) + ":"
+                + toBase36(receiverId) + ":"
+                + trace;
+    }
+
+    private String buildJoinSelfEventKey(Long teamId, Long joinedUserId, String trace) {
+        return "TJS:"
+                + toBase36(teamId) + ":"
+                + toBase36(joinedUserId) + ":"
+                + trace;
+    }
+
+    private String toBase36(Long value) {
+        if (value == null) return "0";
+        return Long.toUnsignedString(value, 36);
     }
 }
