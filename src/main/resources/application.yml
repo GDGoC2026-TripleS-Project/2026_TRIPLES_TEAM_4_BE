@@ -65,6 +65,7 @@ springdoc:
 jwt:
   secret: ${JWT_SECRET:unimate-local-jwt-secret-key-32bytes!!}
   expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
 
 aws:
   s3:

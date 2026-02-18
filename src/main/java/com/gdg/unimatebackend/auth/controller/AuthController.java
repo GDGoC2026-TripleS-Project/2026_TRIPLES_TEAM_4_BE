@@ -108,7 +108,15 @@ public class AuthController {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "JWT가 필요합니다"));
         }
+        Long userId = (Long) authentication.getPrincipal();
+        authService.logout(userId);
         return ResponseEntity.ok(Map.of("message", "로그아웃되었습니다"));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "토큰 재발급", description = "refresh token으로 access token을 재발급합니다")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(authService.refresh(request.getRefreshToken()));
     }
 
     // 1) 로그인 시작

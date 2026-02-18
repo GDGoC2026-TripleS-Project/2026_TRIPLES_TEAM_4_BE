@@ -17,6 +17,7 @@ public class SocialAuthService {
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private final RefreshTokenService refreshTokenService;
 
     private final KakaoApiService kakaoClient;
     private final NaverApiService naverClient;
@@ -62,8 +63,10 @@ public class SocialAuthService {
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+        String refreshToken = refreshTokenService.issueForUser(user);
         return AuthResponse.builder()
                 .token(token)
+                .refreshToken(refreshToken)
                 .userId(user.getId())
                 .email(user.getEmail())
                 .nickname(user.getNickname())

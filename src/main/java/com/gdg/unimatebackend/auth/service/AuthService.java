@@ -27,6 +27,7 @@ public class AuthService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final RefreshTokenService refreshTokenService;
     private final FcmDeviceTokenRepository fcmDeviceTokenRepository;
 
     private static final int VERIFICATION_CODE_EXPIRY_MINUTES = 10;
@@ -112,14 +113,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail());
-
-        return AuthResponse.builder()
-                .token(token)
-                .userId(user.getId())
-                .email(user.getEmail())
-                .nickname(user.getNickname())
-                .build();
+        return createAuthResponse(user);
     }
 
     @Transactional
@@ -135,14 +129,7 @@ public class AuthService {
             throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다");
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail());
-
-        return AuthResponse.builder()
-                .token(token)
-                .userId(user.getId())
-                .email(user.getEmail())
-                .nickname(user.getNickname())
-                .build();
+        return createAuthResponse(user);
     }
 
     /**
@@ -155,6 +142,7 @@ public class AuthService {
     public void deleteAccount(Long userId) {
         // (1) FCM 토큰 삭제
         fcmDeviceTokenRepository.deleteByUserId(userId);
+        refreshTokenService.revokeAllByUserId(userId);
 
         // (2) users 삭제 시도
         try {
@@ -231,5 +219,37 @@ public class AuthService {
         if (userRepository.existsByNickname(nickname)) {
             throw new IllegalArgumentException("이미 사용 중인 닉네임입니다");
         }
+    }
+
+    @Transactional
+    public AuthResponse refresh(String rawRefreshToken) {
+        var rotated = refreshTokenService.rotate(rawRefreshToken);
+        User user = rotated.user();
+        String accessToken = jwtUtil.generateToken(user.getId(), user.getEmail());
+
+        return AuthResponse.builder()
+                .token(accessToken)
+                .refreshToken(rotated.refreshToken())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .build();
+    }
+
+    @Transactional
+    public void logout(Long userId) {
+        refreshTokenService.revokeAllByUserId(userId);
+    }
+
+    private AuthResponse createAuthResponse(User user) {
+        String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+        String refreshToken = refreshTokenService.issueForUser(user);
+        return AuthResponse.builder()
+                .token(token)
+                .refreshToken(refreshToken)
+                .userId(user.getId())
+                .email(user.getEmail())
+                .nickname(user.getNickname())
+                .build();
     }
 }
