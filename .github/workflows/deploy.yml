@@ -48,6 +48,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Configure AWS credentials (ECR pull token)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get ECR login password
+        id: ecr_login
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "password=$(aws ecr get-login-password --region "${AWS_REGION}")" >> "$GITHUB_OUTPUT"
+
       - name: Deploy (docker pull & run)
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -66,8 +80,10 @@ jobs:
             IMAGE="${ECR_REGISTRY}/${ECR_REPO}:unimate-latest"
 
             echo "IMAGE=${IMAGE}"
+            echo "HOST=$(hostname)"
+            docker --version
 
-            aws ecr get-login-password --region "${AWS_REGION}" \
+            echo '${{ steps.ecr_login.outputs.password }}' \
               | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
 
             docker pull "${IMAGE}"
