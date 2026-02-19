@@ -1,7 +1,5 @@
 spring:
   datasource:
-    # 운영은 DB_HOST/PORT/NAME로도 되고, SPRING_DATASOURCE_URL로도 됨.
-    # 지금 너는 .env에 SPRING_DATASOURCE_URL을 넣었으니 그걸 우선으로 쓰게 두는 게 깔끔.
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME}?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME}}
     password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
