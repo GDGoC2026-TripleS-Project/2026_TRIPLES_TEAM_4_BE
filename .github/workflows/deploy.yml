@@ -149,7 +149,7 @@ jobs:
               "${IMAGE}"
 
             for i in $(seq 1 30); do
-              if curl -sf "${{ env.HEALTH_URL }}" > /dev/null; then
+              if curl --max-time 3 -sf "${{ env.HEALTH_URL }}" > /dev/null; then
                 echo "OK: health endpoint is responding"
                 break
               fi
@@ -157,12 +157,13 @@ jobs:
               sleep 2
             done
 
-            curl -sf "${{ env.HEALTH_URL }}" > /dev/null
+            curl --max-time 5 -sf "${{ env.HEALTH_URL }}" > /dev/null
 
             docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
             echo "=== check openapi ==="
-            curl -I http://127.0.0.1:8080/v3/api-docs | head -n 10
+            curl --max-time 8 -fsS -D - -o /dev/null http://127.0.0.1:8080/v3/api-docs | sed -n '1,10p'
 
             echo "=== check swagger-ui index ==="
-            curl -I http://127.0.0.1:8080/swagger-ui/index.html | head -n 10
+            curl --max-time 8 -fsS -D - -o /dev/null http://127.0.0.1:8080/swagger-ui/index.html | sed -n '1,10p'
+            echo "=== deploy end: $(date) ==="
