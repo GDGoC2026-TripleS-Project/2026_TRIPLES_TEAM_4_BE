@@ -21,6 +21,8 @@ public class NotificationItemResponse {
     private Long receiverId;
     private Long teamScheduleId;
     private Long pokeId;
+    private Long meetingPollId;
+    private String meetingNavigationTarget;
 
     private boolean isRead;
     private boolean action;

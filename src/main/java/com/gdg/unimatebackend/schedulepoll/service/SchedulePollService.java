@@ -218,11 +218,11 @@ public class SchedulePollService {
             log.info("[SCHEDULE_POLL_NOTI] created. pollId={}, notificationId={}, receiverId={}, type={}",
                     poll.getId(), saved.getId(), receiverId, type);
 
-            sendMeetingFcm(saved, receiverId, type);
+            sendMeetingFcm(saved, receiverId, type, poll.getId());
         }
     }
 
-    private void sendMeetingFcm(Notification notification, Long receiverId, String type) {
+    private void sendMeetingFcm(Notification notification, Long receiverId, String type, Long pollId) {
         var tokenOpt = fcmDeviceTokenRepository.findTopByUserIdAndIsActiveTrueOrderByUpdatedAtDesc(receiverId);
         if (tokenOpt.isEmpty()) {
             log.info("[SCHEDULE_POLL_NOTI] no token. receiverId={}, notificationId={}", receiverId, notification.getId());
@@ -239,9 +239,11 @@ public class SchedulePollService {
         data.put("type", type != null ? type : "");
         data.put("receiverId", String.valueOf(receiverId));
         data.put("teamId", String.valueOf(notification.getTeamId()));
+        data.put("pollId", pollId != null ? String.valueOf(pollId) : "");
         data.put("teamName", notification.getTeamName() != null ? notification.getTeamName() : "");
         data.put("teamColorHex", notification.getTeamColorHex() != null ? notification.getTeamColorHex() : "#CCCCCC");
         data.put("alarmType", notification.getAlarmType() != null ? notification.getAlarmType() : "알림");
+        data.put("meetingNavigationTarget", "TIMEPICK_STATUS");
         data.put("messageTitle", notification.getMessageTitle() != null ? notification.getMessageTitle() : "");
         data.put("messageBody", notification.getMessageBody() != null ? notification.getMessageBody() : "");
         data.put("createdAt", createdAtText);
