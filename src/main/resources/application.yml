@@ -100,7 +100,7 @@ oauth:
     user-info-uri: https://openapi.naver.com/v1/nid/me
 
   google:
-    client-id: ${GOOGLE_CLIENT_ID:462128480698-qntbdjplosu5j09jq768tij71h74r4or.apps.googleusercontent.com}
+    client-id: ${GOOGLE_CLIENT_ID:1053469759409-obd1i0257vt7qi2djjd1bfcrcp142ljo.apps.googleusercontent.com}
     token-info-uri: https://oauth2.googleapis.com/tokeninfo
 
 fcm:

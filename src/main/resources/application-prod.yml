@@ -44,7 +44,7 @@ oauth:
     redirect-uri: http://unimate-alb-274308250.ap-northeast-2.elb.amazonaws.com/api/auth/naver/callback
 
   google:
-    client-id: ${GOOGLE_CLIENT_ID:462128480698-qntbdjplosu5j09jq768tij71h74r4or.apps.googleusercontent.com}
+    client-id: ${GOOGLE_CLIENT_ID:1053469759409-obd1i0257vt7qi2djjd1bfcrcp142ljo.apps.googleusercontent.com}
 
 fcm:
   project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
