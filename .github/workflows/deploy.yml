@@ -78,7 +78,7 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ steps.discover_hosts.outputs.hosts }}
-          sync: true
+          sync: false
           username: ubuntu
           port: 22
           key: ${{ secrets.EC2_SSH_KEY }}
@@ -86,6 +86,7 @@ jobs:
           envs: AWS_REGION,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN
           script: |
             set -e
+            echo "=== deploy start: $(date) ==="
 
             AWS_REGION="${{ env.AWS_REGION }}"
             ECR_REGISTRY="${{ secrets.ECR_REGISTRY }}"
@@ -99,17 +100,19 @@ jobs:
             aws ecr get-login-password --region "${AWS_REGION}" \
               | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
 
+            echo "=== docker pull start ==="
             docker pull "${IMAGE}"
+            echo "=== docker pull done ==="
 
             # ✅ 8080 포트 점유 정리
             echo "=== check who uses 8080 ==="
-            sudo ss -ltnp | grep ':8080' || true
+            sudo -n ss -ltnp | grep ':8080' || ss -ltn | grep ':8080' || true
 
             echo "=== stop containers publishing 8080 ==="
             docker ps --filter "publish=8080" -q | xargs -r docker rm -f
 
             echo "=== check again ==="
-            sudo ss -ltnp | grep ':8080' || true
+            sudo -n ss -ltnp | grep ':8080' || ss -ltn | grep ':8080' || true
 
             docker rm -f "${{ env.CONTAINER_NAME }}" || true
 
@@ -130,7 +133,6 @@ jobs:
               -e SPRING_DATASOURCE_PASSWORD='${{ secrets.DB_PASSWORD }}' \
               -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
               -e GOOGLE_CLIENT_ID='462128480698-qntbdjplosu5j09jq768tij71h74r4or.apps.googleusercontent.com' \
-              -e GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
               -e MAIL_HOST='${{ secrets.MAIL_HOST }}' \
               -e MAIL_PORT='${{ secrets.MAIL_PORT }}' \
               -e MAIL_USERNAME='${{ secrets.MAIL_USERNAME }}' \
