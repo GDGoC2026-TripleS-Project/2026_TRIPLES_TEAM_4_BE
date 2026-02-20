@@ -6,6 +6,7 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
+  ASG_NAME: unimate-asg
   ECR_REPOSITORY: test
   CONTAINER_NAME: unimate-app
   HEALTH_URL: http://localhost:8080/actuator/health
@@ -55,10 +56,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Discover running EC2 public IPs from ASG
+        id: discover_hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOSTS=$(aws ec2 describe-instances \
+            --filters "Name=tag:aws:autoscaling:groupName,Values=${{ env.ASG_NAME }}" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].PublicIpAddress" \
+            --output text | tr '\t' ',' | sed 's/^,*//;s/,*$//')
+
+          if [ -z "$HOSTS" ] || [ "$HOSTS" = "None" ]; then
+            echo "No running EC2 public IPs found for ASG=${{ env.ASG_NAME }}"
+            exit 1
+          fi
+
+          echo "Resolved deploy hosts: $HOSTS"
+          echo "hosts=$HOSTS" >> "$GITHUB_OUTPUT"
+
       - name: Deploy (docker pull & run)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 43.201.20.209,43.201.148.138
+          host: ${{ steps.discover_hosts.outputs.hosts }}
           sync: true
           username: ubuntu
           port: 22
