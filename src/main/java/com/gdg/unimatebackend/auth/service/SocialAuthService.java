@@ -21,6 +21,7 @@ public class SocialAuthService {
 
     private final KakaoApiService kakaoClient;
     private final NaverApiService naverClient;
+    private final GoogleApiService googleClient;
 
     @Transactional
     public AuthResponse loginByAccessToken(AuthProvider provider, String accessToken) {
@@ -42,6 +43,16 @@ public class SocialAuthService {
                     me.response().id(),
                     me.response().email(),
                     (me.response().nickname() == null || me.response().nickname().isBlank()) ? "네이버사용자" : me.response().nickname()
+            );
+        }
+
+        if (provider == AuthProvider.GOOGLE) {
+            var me = googleClient.fetchUserInfoFromIdToken(accessToken);
+            return upsertAndIssueJwt(
+                    AuthProvider.GOOGLE,
+                    me.id(),
+                    me.email(),
+                    me.name()
             );
         }
 

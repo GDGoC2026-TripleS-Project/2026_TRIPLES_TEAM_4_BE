@@ -43,6 +43,9 @@ oauth:
     client-secret: ${NAVER_CLIENT_SECRET}
     redirect-uri: http://unimate-alb-274308250.ap-northeast-2.elb.amazonaws.com/api/auth/naver/callback
 
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:462128480698-qntbdjplosu5j09jq768tij71h74r4or.apps.googleusercontent.com}
+
 fcm:
   project-id: ${FCM_PROJECT_ID:unimate-1d1d1}
   key-path: ${FCM_KEY_PATH:/app/firebase-key.json}

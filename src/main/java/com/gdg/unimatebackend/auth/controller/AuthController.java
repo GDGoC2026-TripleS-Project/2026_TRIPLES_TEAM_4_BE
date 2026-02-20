@@ -20,7 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@Tag(name = "OAuth", description = "네이버/카카오 OAuth")
+@Tag(name = "OAuth", description = "네이버/카카오/구글 OAuth")
 public class AuthController {
 
     private final AuthService authService;
@@ -162,7 +162,7 @@ public class AuthController {
 
     // 3) accessToken 직접 전달 (선택)
     @PostMapping("/social/login")
-    @Operation(summary = "[공통] accessToken 기반 소셜 로그인")
+    @Operation(summary = "[공통] accessToken 기반 소셜 로그인", description = "provider=KAKAO/NAVER/GOOGLE. GOOGLE은 idToken을 accessToken 필드로 전달")
     public ResponseEntity<AuthResponse> socialLogin(@Valid @RequestBody SocialLoginRequest request) {
         return ResponseEntity.ok(socialAuthService.loginByAccessToken(request.getProvider(), request.getAccessToken()));
     }

@@ -129,7 +129,7 @@ jobs:
               -e SPRING_DATASOURCE_USERNAME='${{ secrets.DB_USERNAME }}' \
               -e SPRING_DATASOURCE_PASSWORD='${{ secrets.DB_PASSWORD }}' \
               -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
-              -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
+              -e GOOGLE_CLIENT_ID='462128480698-qntbdjplosu5j09jq768tij71h74r4or.apps.googleusercontent.com' \
               -e GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
               -e MAIL_HOST='${{ secrets.MAIL_HOST }}' \
               -e MAIL_PORT='${{ secrets.MAIL_PORT }}' \
