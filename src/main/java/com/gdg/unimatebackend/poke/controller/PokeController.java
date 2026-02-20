@@ -38,7 +38,8 @@ public class PokeController {
             @ApiResponse(responseCode = "200", description = "찌르기 처리 완료"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
             @ApiResponse(responseCode = "403", description = "같은 팀원이 아님"),
-            @ApiResponse(responseCode = "404", description = "찌르기 문구 없음")
+            @ApiResponse(responseCode = "404", description = "찌르기 문구 없음"),
+            @ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @PostMapping
     public ResponseEntity<PokeResponse> sendPokes(
@@ -58,7 +59,8 @@ public class PokeController {
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공")
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @GetMapping("/targets")
     public ResponseEntity<PokeTargetsResponse> getTargets(Authentication authentication) {
@@ -75,7 +77,8 @@ public class PokeController {
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공")
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @GetMapping("/messages")
     public ResponseEntity<List<PokeMessageResponse>> getMessages() {

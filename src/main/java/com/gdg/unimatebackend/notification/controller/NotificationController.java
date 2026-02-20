@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/notifications")
-@Tag(name = "알림", description = "알림 완료 처리 API")
+@Tag(name = "알림", description = "알림 조회/읽음/액션 완료 처리 API")
 public class NotificationController {
 
     private final NotificationCompletionService notificationCompletionService;
@@ -61,7 +61,11 @@ public class NotificationController {
     @Operation(
             summary = "내 알림 목록 조회",
             description = "알림 목록을 조회합니다. 처리되지 않은 알림이 먼저 오고, 처리된 알림은 processedAt desc로 정렬됩니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "조회 성공"),
+                    @ApiResponse(responseCode = "401", description = "인증 실패")
+            }
     )
     @GetMapping
     public ResponseEntity<java.util.List<NotificationItemResponse>> list(Authentication authentication) {
@@ -72,7 +76,11 @@ public class NotificationController {
     @Operation(
             summary = "DDAY 테스트 실행(임시)",
             description = "DDAY 스케줄러 로직을 즉시 실행합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "실행 성공"),
+                    @ApiResponse(responseCode = "401", description = "인증 실패")
+            }
     )
     @PostMapping("/dday-test/run")
     public ResponseEntity<java.util.Map<String, String>> runDdayTest(Authentication authentication) {
@@ -83,7 +91,13 @@ public class NotificationController {
     @Operation(
             summary = "알림 읽음 처리",
             description = "isRead=true, processedAt=now. action=true인 알림은 actionDone 이후에만 처리됩니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "처리 성공"),
+                    @ApiResponse(responseCode = "400", description = "actionDone 이전 상태 등 처리 불가"),
+                    @ApiResponse(responseCode = "401", description = "인증 실패"),
+                    @ApiResponse(responseCode = "404", description = "알림 없음")
+            }
     )
     @PatchMapping("/{notificationId}/read")
     public ResponseEntity<NotificationItemResponse> markRead(
@@ -97,7 +111,11 @@ public class NotificationController {
     @Operation(
             summary = "알림 전체 읽음 처리(버튼 없는 알림만)",
             description = "action=false 알림만 전체 읽음 처리합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "처리 성공"),
+                    @ApiResponse(responseCode = "401", description = "인증 실패")
+            }
     )
     @PatchMapping("/read-all")
     public ResponseEntity<java.util.Map<String, Integer>> readAll(Authentication authentication) {
@@ -109,7 +127,12 @@ public class NotificationController {
     @Operation(
             summary = "알림 액션 완료 처리",
             description = "actionDone=true만 변경합니다. read/processedAt은 변경하지 않습니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "처리 성공"),
+                    @ApiResponse(responseCode = "401", description = "인증 실패"),
+                    @ApiResponse(responseCode = "404", description = "알림 없음")
+            }
     )
     @PatchMapping("/{notificationId}/action-done")
     public ResponseEntity<NotificationItemResponse> actionDone(
