@@ -73,11 +73,14 @@ public class TeamImageService {
             amazonS3.putObject(bucket, newKey, is, meta);
             log.info("[S3] new team image uploaded. key={}", newKey);
         } catch (Exception e) {
+            log.error("[S3] team image upload failed. teamId={}, key={}, reason={}", teamId, newKey, e.getMessage(), e);
             throw new IllegalArgumentException("S3 업로드 실패: " + e.getMessage());
         }
 
         String imageUrl = buildUrl(newKey);
         team.updateImage(newKey, imageUrl);
+        teamRepository.save(team);
+        log.info("[TEAM] team image updated. teamId={}, imageUrl={}", teamId, imageUrl);
         return imageUrl;
     }
 
