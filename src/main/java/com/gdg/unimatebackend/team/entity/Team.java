@@ -57,6 +57,12 @@ public class Team {
     @Column(name = "invite_code_expires_at")
     private LocalDateTime inviteCodeExpiresAt;
 
+    @Column(name = "image_url", length = 600)
+    private String imageUrl;
+
+    @Column(name = "image_key", length = 600)
+    private String imageKey;
+
     public void issueInviteCode(String inviteCode, LocalDateTime expiresAt) {
         this.inviteCode = inviteCode;
         this.inviteCodeExpiresAt = expiresAt;
@@ -72,5 +78,10 @@ public class Team {
         if (description != null) this.description = description;
         if (startAt != null) this.startAt = startAt;
         if (endAt != null) this.endAt = endAt;
+    }
+
+    public void updateImage(String imageKey, String imageUrl) {
+        this.imageKey = imageKey;
+        this.imageUrl = imageUrl;
     }
 }

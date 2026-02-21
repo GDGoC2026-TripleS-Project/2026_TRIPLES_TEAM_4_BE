@@ -15,6 +15,7 @@ public class TeamResponse {
     private String description;
     private TeamColor color;
     private String colorHex;
+    private String imageUrl;
     private Long ownerUserId;
     private LocalDateTime startAt;
     private LocalDateTime endAt;

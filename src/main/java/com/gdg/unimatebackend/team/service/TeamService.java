@@ -97,6 +97,7 @@ public class TeamService {
                     .description(t.getDescription())
                     .color(myDisplayColor)
                     .colorHex(myDisplayColor != null ? myDisplayColor.getHex() : null)
+                    .imageUrl(t.getImageUrl())
                     .myRole(myRole)
                     .memberCount(memberCount)
                     .startAt(t.getStartAt())
@@ -153,6 +154,9 @@ public class TeamService {
             validateTeamPeriod(newStart, newEnd);
         }
         team.update(request.getName(), request.getDescription(), request.getStartAt(), request.getEndAt());
+        if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+            team.updateImage(team.getImageKey(), request.getImageUrl());
+        }
         teamEndNotificationService.notifyIfEnded(team, userId);
         return toTeamResponse(team);
     }
@@ -385,6 +389,7 @@ public class TeamService {
                 .description(team.getDescription())
                 .color(team.getColor())
                 .colorHex(team.getColor() != null ? team.getColor().getHex() : null)
+                .imageUrl(team.getImageUrl())
                 .ownerUserId(team.getOwnerUserId())
                 .startAt(team.getStartAt())
                 .endAt(team.getEndAt())

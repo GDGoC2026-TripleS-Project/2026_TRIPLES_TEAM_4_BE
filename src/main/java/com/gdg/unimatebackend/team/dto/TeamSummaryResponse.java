@@ -16,6 +16,7 @@ public class TeamSummaryResponse {
     private String description;
     private TeamColor color;
     private String colorHex;
+    private String imageUrl;
     private TeamRole myRole;
     private long memberCount;
     private LocalDateTime startAt;

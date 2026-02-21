@@ -1,6 +1,7 @@
 package com.gdg.unimatebackend.team.controller;
 
 import com.gdg.unimatebackend.team.dto.*;
+import com.gdg.unimatebackend.team.service.TeamImageService;
 import com.gdg.unimatebackend.team.service.TeamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -8,9 +9,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -21,6 +24,7 @@ import java.util.List;
 public class TeamController {
 
     private final TeamService teamService;
+    private final TeamImageService teamImageService;
 
     @Operation(
             summary = "팀 생성",
@@ -90,6 +94,30 @@ public class TeamController {
     ) {
         Long userId = (Long) authentication.getPrincipal();
         return ResponseEntity.ok(teamService.updateTeam(userId, teamId, request));
+    }
+
+    @Operation(
+            summary = "팀 이미지 업로드",
+            description = """
+                    팀 이미지를 업로드합니다. (팀장만)
+                    - multipart/form-data 형식의 이미지 파일을 업로드합니다.
+                    - 업로드된 이미지는 AWS S3에 저장됩니다.
+                    - 기존 팀 이미지가 있으면 이전 이미지는 S3에서 삭제됩니다.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @PostMapping(
+            value = "/{teamId}/image",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<java.util.Map<String, String>> uploadTeamImage(
+            Authentication authentication,
+            @PathVariable Long teamId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        String imageUrl = teamImageService.uploadAndReplaceTeamImage(userId, teamId, file);
+        return ResponseEntity.ok(java.util.Map.of("imageUrl", imageUrl));
     }
 
     @Operation(

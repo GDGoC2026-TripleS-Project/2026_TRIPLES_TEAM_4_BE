@@ -16,4 +16,6 @@ public class TeamUpdateRequest {
 
     private LocalDateTime startAt;
     private LocalDateTime endAt;
+
+    private String imageUrl;
 }
